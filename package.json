@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/fix-duplicates.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
