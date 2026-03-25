@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/fix-duplicates.mjs",
+    "prebuild": "node scripts/fix-duplicates.mjs && node scripts/add-csv-import.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
