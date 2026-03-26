@@ -1,5 +1,7 @@
 // Vercel Serverless Function — POST /api/make-call
-// Initiates a Twilio outbound call: rings the user's phone, then connects to the client
+// Initiates a Twilio outbound call: rings a target phone, then connects to the client.
+// Supports escalation: when escalation=true, "target" is the chain person's phone
+// (instead of the fixed TWILIO_USER_PHONE env var).
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -8,7 +10,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { to } = req.body || {};
+  const { to, escalation, target, step, totalSteps, timeoutSeconds } = req.body || {};
 
   if (!to) {
     return res.status(400).json({ error: "Missing 'to' field (client phone)" });
@@ -23,14 +25,29 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Twilio credentials not configured" });
   }
 
-  if (!userPhone) {
-    return res.status(500).json({ error: "TWILIO_USER_PHONE not configured" });
+  // Determine who to ring: escalation target phone, or the default TWILIO_USER_PHONE
+  let ringPhone;
+  if (escalation && target) {
+    ringPhone = target.replace(/[^+\d]/g, "");
+    if (!ringPhone.startsWith("+")) {
+      ringPhone = ringPhone.length === 10 ? "+1" + ringPhone : "+" + ringPhone;
+    }
+  } else {
+    if (!userPhone) {
+      return res.status(500).json({ error: "TWILIO_USER_PHONE not configured — add your phone number in Vercel env vars" });
+    }
+    ringPhone = userPhone;
   }
 
   // Clean client phone number
   let toPhone = to.replace(/[^+\d]/g, "");
   if (!toPhone.startsWith("+")) {
     toPhone = toPhone.length === 10 ? "+1" + toPhone : "+" + toPhone;
+  }
+
+  // Enforce escalation chain length cap (max 10 levels)
+  if (escalation && typeof step === "number" && step > 10) {
+    return res.status(400).json({ error: "Escalation chain exceeds maximum depth (10)" });
   }
 
   try {
@@ -41,19 +58,25 @@ export default async function handler(req, res) {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
 
-    // Step 1: Call the USER's phone
-    // Step 2: When user answers, Twilio fetches twimlUrl which dials the client
+    // Build call parameters
+    const callParams = {
+      To: ringPhone,
+      From: from,
+      Url: twimlUrl,
+    };
+
+    // Set ring timeout for escalation calls (default 30s)
+    if (escalation) {
+      callParams.Timeout = String(timeoutSeconds || 30);
+    }
+
     const response = await fetch(twilioUrl, {
       method: "POST",
       headers: {
         "Authorization": `Basic ${auth}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        To: userPhone,
-        From: from,
-        Url: twimlUrl,
-      }).toString(),
+      body: new URLSearchParams(callParams).toString(),
     });
 
     const data = await response.json();
@@ -70,6 +93,9 @@ export default async function handler(req, res) {
       success: true,
       sid: data.sid,
       status: data.status,
+      escalation: !!escalation,
+      step: typeof step === "number" ? step : 0,
+      totalSteps: totalSteps || 1,
     });
   } catch (err) {
     console.error("Make call error:", err);
