@@ -94,7 +94,7 @@ if (!fnInserted) {
 }
 
 // PATCH 3: Add "Editar" button after Invoice button
-const invoiceMarker = 'Invoice</button>';
+const invoiceMarker = '\u{1F4C4} Invoice</button>';
 const invoiceIdx = content.indexOf(invoiceMarker);
 if (invoiceIdx !== -1) {
   const afterInvoice = invoiceIdx + invoiceMarker.length;
