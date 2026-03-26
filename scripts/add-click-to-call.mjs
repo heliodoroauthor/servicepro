@@ -119,15 +119,15 @@ let callSearchPos = 0;
 while (!callBtnFixed) {
   const classIdx = content.indexOf('client-qa-btn', callSearchPos);
   if (classIdx === -1) break;
-  const snippet = content.slice(classIdx, classIdx + 200);
-  // Check if this button contains "Call" but NOT other button labels
-  if (snippet.indexOf('Call') !== -1 && snippet.indexOf('Invoice') === -1
-      && snippet.indexOf('Text') === -1 && snippet.indexOf('Editar') === -1
-      && snippet.indexOf('sms:') === -1) {
+  // Scope the snippet to this button's </button> â not a fixed 200 chars
+  const btnCloseIdx = content.indexOf('</button>', classIdx);
+  if (btnCloseIdx === -1) { callSearchPos = classIdx + 1; continue; }
+  const snippet = content.slice(classIdx, btnCloseIdx);
+  // Check if this button contains "Call" (within its own bounds only)
+  if (snippet.indexOf('Call') !== -1 && snippet.indexOf('Invoice') === -1) {
     const btnStart = content.lastIndexOf('<button', classIdx);
     if (btnStart !== -1) {
-      const callPos = classIdx + snippet.indexOf('Call');
-      const closeBtn = content.indexOf('</button>', callPos);
+      const closeBtn = btnCloseIdx;
       if (closeBtn !== -1) {
         const fullBtn = content.slice(btnStart, closeBtn + '</button>'.length);
         const newCallBtn = '<button className="client-qa-btn" onClick={()=>callClient(selC?.phone)} disabled={calling}>\n{calling?"\\u23F3 Llamando...":"\\u{1F4DE} Call"}\n</button>';
@@ -145,4 +145,3 @@ if (!callBtnFixed) {
 
 writeFileSync(file, content);
 console.log('[add-click-to-call] All click-to-call patches applied successfully!');
-
