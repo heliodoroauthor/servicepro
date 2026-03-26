@@ -30,8 +30,10 @@ function findFunctionRange(src, funcName) {
   return { start: lineStart, end: i };
 }
 
-// PATCH 1: Add editing states after ctab state
-const editStates = '  const [editingClient, setEditingClient] = useState(false);\n  const [editForm, setEditForm] = useState({});\n';
+// âââ PATCH 1: Add editing states after ctab state âââ
+const editStates = `  const [editingClient, setEditingClient] = useState(false);
+  const [editForm, setEditForm] = useState({});\n`;
+
 const ctabIdx = content.indexOf('const [ctab, setCtab] = useState(');
 if (ctabIdx !== -1) {
   const eol = content.indexOf('\n', ctabIdx);
@@ -43,7 +45,7 @@ if (ctabIdx !== -1) {
   console.warn('[add-client-edit] WARNING: Could not find ctab state');
 }
 
-// PATCH 2: Add startEditClient + saveEditClient functions
+// âââ PATCH 2: Add startEditClient + saveEditClient functions âââ
 const editFunctions = `
   function startEditClient() {
     if(!selC) return;
@@ -81,6 +83,7 @@ if (callClientRange) {
   console.log('[add-client-edit] PATCH 2: Injected editing functions after callClient');
 }
 if (!fnInserted) {
+  // Fallback: insert after sendSms
   const sendSmsRange = findFunctionRange(content, 'sendSms');
   if (sendSmsRange) {
     content = content.slice(0, sendSmsRange.end) + '\n' + editFunctions + '\n' + content.slice(sendSmsRange.end);
@@ -93,29 +96,43 @@ if (!fnInserted) {
   process.exit(1);
 }
 
-// PATCH 3: Add "Editar" button after Invoice button
-// Find Invoice</button> that belongs to a client-qa-btn (not "Save as Invoice")
+// âââ PATCH 3: Add "Editar" button after Invoice button âââ
+// The client-qa-btn Invoice button is multiline in the JSX source:
+//   <button className="client-qa-btn" onClick={()=>setModal("new-invoice")}>
+//   ð§¾ Invoice
+//   </button>
+// So 'Invoice</button>' won't match (there's a newline between them).
+// Strategy: find each 'client-qa-btn' occurrence, check if "Invoice" appears
+// nearby in the same button, then locate the closing </button> tag.
 let invoiceFound = false;
 let searchPos = 0;
-while (true) {
-  const idx = content.indexOf('Invoice</button>', searchPos);
-  if (idx === -1) break;
-  const openTag = content.lastIndexOf('<button', idx);
-  if (openTag !== -1 && content.slice(openTag, idx).includes('client-qa-btn')) {
-    const afterInvoice = idx + 'Invoice</button>'.length;
-    const editButton = '<button className="client-qa-btn" onClick={startEditClient}>\u270F\uFE0F Editar</button>';
-    content = content.slice(0, afterInvoice) + editButton + content.slice(afterInvoice);
-    invoiceFound = true;
-    console.log('[add-client-edit] PATCH 3: Added Editar button after Invoice');
-    break;
+while (!invoiceFound) {
+  const classIdx = content.indexOf('client-qa-btn', searchPos);
+  if (classIdx === -1) break;
+  // Look ahead up to 200 chars for "Invoice" in this button's content
+  const snippet = content.slice(classIdx, classIdx + 200);
+  const invOffset = snippet.indexOf('Invoice');
+  if (invOffset !== -1) {
+    // Confirm this isn't a button we're about to inject (no "Editar" nearby)
+    if (snippet.indexOf('Editar') === -1) {
+      const invoiceAbsPos = classIdx + invOffset;
+      const closingTag = content.indexOf('</button>', invoiceAbsPos);
+      if (closingTag !== -1) {
+        const afterClose = closingTag + '</button>'.length;
+        const editButton = '\n<button className="client-qa-btn" onClick={startEditClient}>\u270F\uFE0F Editar</button>';
+        content = content.slice(0, afterClose) + editButton + content.slice(afterClose);
+        invoiceFound = true;
+        console.log('[add-client-edit] PATCH 3: Added Editar button after Invoice (at pos ' + classIdx + ')');
+      }
+    }
   }
-  searchPos = idx + 1;
+  searchPos = classIdx + 1;
 }
 if (!invoiceFound) {
-  console.warn('[add-client-edit] WARNING: Could not find Invoice button');
+  console.warn('[add-client-edit] WARNING: Could not find Invoice button with client-qa-btn class');
 }
 
-// PATCH 4: Add edit Modal before pets tab
+// âââ PATCH 4: Add edit Modal before pets tab âââ
 const editModal = `{editingClient && <Modal title="Editar Cliente" onClose={()=>setEditingClient(false)} foot={<><Btn cls="btn-ghost" onClick={()=>setEditingClient(false)}>Cancelar</Btn><Btn onClick={saveEditClient}>Guardar Cambios</Btn></>}>
               <div className="g2">
                 <div className="fg"><label>Nombre</label><input className="inp" value={editForm.firstName||""} onChange={e=>setEditForm(p=>({...p,firstName:e.target.value}))}/></div>
@@ -133,6 +150,7 @@ const editModal = `{editingClient && <Modal title="Editar Cliente" onClose={()=>
 const petsMarker = 'ctab==="pets"';
 const petsIdx = content.indexOf(petsMarker);
 if (petsIdx !== -1) {
+  // Find the { before ctab==="pets"
   let j = petsIdx - 1;
   while (j >= 0 && content[j] !== '{') j--;
   if (j >= 0) {
