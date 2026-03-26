@@ -194,7 +194,7 @@ while (!jobMsgFixed) {
 
   if (fullBtn.includes('cl?.phone') && fullBtn.includes('Message')) {
     // Replace with a button that sends an SMS via Twilio (opens a prompt for the message)
-    const newMsgBtn = '<button className="client-qa-btn" style={{background:"var(--s2)"}} onClick={()=>{if(!cl?.phone)return;const msg=prompt("Mensaje para "+cl.name+":");if(msg)fetch("/api/send-sms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:cl.phone,body:msg})}).then(r=>r.json()).then(d=>{if(d.error)alert("Error: "+d.error);else alert("SMS enviado \\u2705")}).catch(e=>alert("Error: "+e.message))}}>\n\\u{1F4AC} Message\n</button>';
+    const newMsgBtn = '<button className="client-qa-btn" style={{background:"var(--s2)"}} onClick={()=>{if(!cl?.phone)return;const msg=prompt("Mensaje para "+cl.name+":");if(msg)fetch("/api/send-sms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:cl.phone,body:msg})}).then(r=>r.json()).then(d=>{if(d.error)alert("Error: "+d.error);else alert("SMS enviado \\u2705")}).catch(e=>alert("Error: "+e.message))}}>\n💬 Message\n</button>';
     content = content.slice(0, btnStart) + newMsgBtn + content.slice(btnStart + fullBtn.length);
     jobMsgFixed = true;
     console.log('[add-jobs-call] PATCH 4: Replaced Jobs message button with Twilio SMS');
@@ -252,7 +252,7 @@ if (viewClientIdx !== -1 && viewClientIdx < jobsPageRange5.end) {
     const aEnd = content.indexOf('</a>', telLinkIdx);
     if (aStart !== -1 && aEnd !== -1) {
       const fullLink = content.slice(aStart, aEnd + '</a>'.length);
-      const newPhoneLink = '<button onClick={()=>callClientFromJob(cl?.phone, cl?.name)} disabled={jobCalling} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,color:"var(--text)",fontWeight:600,fontSize:13,cursor:"pointer",width:"100%"}}>\n\\u{1F4DE} {cl?.phone}\n</button>';
+      const newPhoneLink = '<button onClick={()=>callClientFromJob(cl?.phone, cl?.name)} disabled={jobCalling} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,color:"var(--text)",fontWeight:600,fontSize:13,cursor:"pointer",width:"100%"}}>\n📞 {cl?.phone}\n</button>';
       content = content.slice(0, aStart) + newPhoneLink + content.slice(aStart + fullLink.length);
       console.log('[add-jobs-call] PATCH 6: Replaced tel: link in job-view-client modal');
     }
