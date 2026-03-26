@@ -7,45 +7,48 @@ import { readFileSync, writeFileSync } from 'fs';
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 
-// --- PATCH 1: Add SMS sending states after existing newSms state ---
-const newSmsAnchor = 'const [newSms, setNewSms] = useState("");';
-if (!content.includes(newSmsAnchor)) {
-  const alt = "const [newSms, setNewSms] = useState('');"
-  if (content.includes(alt)) {
-    content = content.replace(alt, alt + `
-  const [smsSending, setSmsSending] = useState(false);
-  const [smsError, setSmsError] = useState("");`);
-  } else {
-    console.warn('[add-twilio-sms] WARNING: Could not find newSms state anchor. Trying fallback...');
-    const fallbackAnchor = 'function sendSms()';
-    if (content.includes(fallbackAnchor)) {
-      content = content.replace(fallbackAnchor,
-        `const [smsSending, setSmsSending] = useState(false);
-  const [smsError, setSmsError] = useState("");
-  ${fallbackAnchor}`);
-    }
+// Helper: find a function body using brace-depth tracking
+function findFunctionRange(src, funcName) {
+  const marker = 'function ' + funcName + '(';
+  const start = src.indexOf(marker);
+  if (start === -1) return null;
+  // Find the opening brace
+  let i = src.indexOf('{', start);
+  if (i === -1) return null;
+  let depth = 1;
+  i++;
+  while (i < src.length && depth > 0) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') depth--;
+    i++;
   }
-} else {
-  content = content.replace(newSmsAnchor, newSmsAnchor + `
-  const [smsSending, setSmsSending] = useState(false);
-  const [smsError, setSmsError] = useState("");`);
+  // Walk back to find the true start (include leading whitespace on same line)
+  let lineStart = start;
+  while (lineStart > 0 && src[lineStart - 1] !== '\n') lineStart--;
+  return { start: lineStart, end: i };
 }
 
-// --- PATCH 2: Replace the mock sendSms function with the real one ---
-const oldVariants = [
-  `function sendSms() {
-    if(!newSms.trim()) return;
-    setSmsLog(p => [...p,{id:Date.now(),clientId:sel,dir:"out",msg:newSms,time:new Date().toLocaleString()}]);
-    setNewSms("");
-  }`,
-  `function sendSms() {
-    if(!newSms.trim()) return;
-    setSmsLog(p => [...p,{id:Date.now(),clientId:sel,dir:"out",msg:newSms,time:new Date().toLocaleString()}]);
-    setNewSms("");
-}`,
-];
+// --- PATCH 1: Add SMS sending states ---
+const smsStates = '  const [smsSending, setSmsSending] = useState(false);\n  const [smsError, setSmsError] = useState("");\n';
 
-const newSendSms = `async function sendSms() {
+// Try to add after newSms state
+const newSmsIdx = content.indexOf('const [newSms, setNewSms] = useState(');
+if (newSmsIdx !== -1) {
+  const eol = content.indexOf('\n', newSmsIdx);
+  if (eol !== -1) {
+    content = content.slice(0, eol + 1) + smsStates + content.slice(eol + 1);
+    console.log('[add-twilio-sms] Injected smsSending/smsError states after newSms');
+  }
+} else {
+  const range = findFunctionRange(content, 'sendSms');
+  if (range) {
+    content = content.slice(0, range.start) + smsStates + content.slice(range.start);
+    console.log('[add-twilio-sms] Injected smsSending/smsError states before sendSms (fallback)');
+  }
+}
+
+// --- PATCH 2: Replace the sendSms function using brace tracking ---
+const newSendSms = `  async function sendSms() {
     if(!newSms.trim() || smsSending) return;
     if(!selC || !selC.phone) { setSmsError("Cliente sin numero de telefono"); return; }
     setSmsSending(true);
@@ -67,58 +70,33 @@ const newSendSms = `async function sendSms() {
     }
   }`;
 
-let patched = false;
-for (const variant of oldVariants) {
-  if (content.includes(variant)) {
-    content = content.replace(variant, newSendSms);
-    patched = true;
-    console.log('[add-twilio-sms] Patched sendSms function (exact match)');
-    break;
-  }
-}
-
-// If exact match failed, use regex to find and replace
-if (!patched) {
-  const sendSmsRegex = /function sendSms\(\)\s*\{[^}]*setSmsLog\([^)]*\)[^}]*setNewSms\([^)]*\)[^}]*\}/;
-  if (sendSmsRegex.test(content)) {
-    content = content.replace(sendSmsRegex, newSendSms);
-    patched = true;
-    console.log('[add-twilio-sms] Patched sendSms function (regex match)');
-  }
-}
-
-if (!patched) {
-  console.error('[add-twilio-sms] ERROR: Could not find sendSms function to patch!');
-  const idx = content.indexOf('function sendSms()');
-  if (idx !== -1) {
-    console.error('  Found at index ' + idx + ', but pattern did not match.');
-    console.error('  Surrounding code: "' + content.substring(idx, idx + 200) + '"');
-  }
+const range = findFunctionRange(content, 'sendSms');
+if (range) {
+  content = content.slice(0, range.start) + newSendSms + '\n' + content.slice(range.end);
+  console.log('[add-twilio-sms] Replaced sendSms function (' + range.start + '-' + range.end + ')');
+} else {
+  console.error('[add-twilio-sms] ERROR: Could not find sendSms function!');
   process.exit(1);
 }
 
-// --- PATCH 3: Add error display and sending indicator to the SMS UI ---
+// --- PATCH 3: Add disabled state to send button ---
 const sendBtnPattern = /onClick=\{sendSms\}/;
 if (sendBtnPattern.test(content)) {
   content = content.replace(sendBtnPattern, 'onClick={sendSms} disabled={smsSending}');
   console.log('[add-twilio-sms] Added disabled state to send button');
 }
 
-// Add error message display before the SMS log
+// --- PATCH 4: Add error message display before SMS log ---
 const smsErrorDisplay = '{smsError && <div style={{color:"#ef4444",padding:"8px 12px",background:"#fef2f2",borderRadius:8,marginBottom:8,fontSize:13}}>{smsError}</div>}';
 
-const smsLogMapPattern = /{cSms\.map\(/;
-if (smsLogMapPattern.test(content)) {
-  content = content.replace(smsLogMapPattern, smsErrorDisplay + '\n              {cSms.map(');
+if (content.includes('{cSms.map(')) {
+  content = content.replace('{cSms.map(', smsErrorDisplay + '\n              {cSms.map(');
   console.log('[add-twilio-sms] Added error display before SMS log');
+} else if (content.includes('{smsLog.filter')) {
+  content = content.replace('{smsLog.filter', smsErrorDisplay + '\n              {smsLog.filter');
+  console.log('[add-twilio-sms] Added error display before SMS log (alt)');
 } else {
-  const altLogPattern = /{smsLog\.filter/;
-  if (altLogPattern.test(content)) {
-    content = content.replace(altLogPattern, smsErrorDisplay + '\n              {smsLog.filter');
-    console.log('[add-twilio-sms] Added error display before SMS log (alt pattern)');
-  } else {
-    console.warn('[add-twilio-sms] Could not find SMS log to add error display');
-  }
+  console.warn('[add-twilio-sms] Could not find SMS log for error display');
 }
 
 writeFileSync(file, content);
