@@ -1,9 +1,8 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// This script patches SettingsPage in pages_e.jsx to add an "Escalation" tab.
-// The tab lets admins configure a call escalation chain with drag-to-reorder,
-// per-module toggles (Clients/Jobs), and timeout settings.
-// Run AFTER all other patches that touch pages_e.jsx.
+// Patches SettingsPage in src/ServiceProApp.jsx to add an "Escalation" tab.
+// Adds escalation chain config with drag-to-reorder, module toggles, timeout settings.
+// Run AFTER all other patches that touch ServiceProApp.jsx.
 
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
@@ -11,25 +10,21 @@ let content = readFileSync(file, 'utf8');
 // ═══════════════════════════════════════════════════════════════
 // PATCH 1: Add "Escalation" tab to STABS array
 // ═══════════════════════════════════════════════════════════════
-// Insert after the last tab entry (Sync)
 const syncTabEntry = '{id:"sync", label:"Sync", icon:"\uD83D\uDD04"}';
 const syncTabIdx = content.indexOf(syncTabEntry);
 if (syncTabIdx === -1) {
-  // Try alternate: the icon might be stored differently
   const altSync = 'id:"sync"';
   const altIdx = content.indexOf(altSync);
   if (altIdx === -1) {
     console.error('[add-escalation-settings] ERROR: Could not find Sync tab in STABS array');
     process.exit(1);
   }
-  // Find the end of this object (closing })
   let bi = content.indexOf('}', altIdx);
   if (bi !== -1) {
-    // Insert after the closing brace and comma
     const afterSync = bi + 1;
     const commaAndNewTab = ',\n{id:"escalation", label:"Escalation", icon:"\uD83D\uDCDE"}';
     content = content.slice(0, afterSync) + commaAndNewTab + content.slice(afterSync);
-    console.log('[add-escalation-settings] PATCH 1: Added Escalation tab to STABS (alt method)');
+    console.log('[add-escalation-settings] PATCH 1: Added Escalation tab (alt method)');
   }
 } else {
   const afterSync = syncTabIdx + syncTabEntry.length;
@@ -39,42 +34,27 @@ if (syncTabIdx === -1) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PATCH 2: Add escalation state variables after the SettingsPage useState
+// PATCH 2: Add escalation states + helper functions after saved state
 // ═══════════════════════════════════════════════════════════════
-// Insert after: var [saved, setSaved] = React.useState(false);
 const savedStateMarker = 'var [saved, setSaved] = React.useState(false);';
-const savedIdx = content.indexOf(savedStateMarker);
+let savedIdx = content.indexOf(savedStateMarker);
+if (savedIdx === -1) {
+  // Try const style
+  const altMarker = 'const [saved, setSaved] = useState(false);';
+  savedIdx = content.indexOf(altMarker);
+}
 if (savedIdx === -1) {
   console.error('[add-escalation-settings] ERROR: Could not find saved state');
   process.exit(1);
 }
 const savedEol = content.indexOf('\n', savedIdx);
 
-const escalationStates = `
+const escalationCode = `
 var escConfig = settings.escalation || {enabled:false, modules:{clients:true,jobs:true}, chain:[], timeoutSeconds:30, clientTimeoutMs:35000};
 var [escChain, setEscChain] = React.useState(escConfig.chain || []);
 var [escDragIdx, setEscDragIdx] = React.useState(null);
 var [escNewName, setEscNewName] = React.useState("");
-var [escNewPhone, setEscNewPhone] = React.useState("");`;
-
-content = content.slice(0, savedEol + 1) + escalationStates + '\n' + content.slice(savedEol + 1);
-console.log('[add-escalation-settings] PATCH 2: Added escalation state variables');
-
-// ═══════════════════════════════════════════════════════════════
-// PATCH 3: Add escalation helper functions after the Inp component
-// ═══════════════════════════════════════════════════════════════
-// Insert after the Inp function closing brace — find "placeholder={props.placeholder" then the next }
-const inpMarker = 'placeholder={props.placeholder';
-const inpIdx = content.indexOf(inpMarker);
-if (inpIdx === -1) {
-  console.error('[add-escalation-settings] ERROR: Could not find Inp component');
-  process.exit(1);
-}
-// Find the closing of the Inp function — two closing braces after the return
-let inpClose = content.indexOf('}\n', content.indexOf('}\n', inpIdx) + 1);
-if (inpClose === -1) inpClose = content.indexOf('}', content.indexOf('}', inpIdx) + 1);
-
-const escalationHelpers = `
+var [escNewPhone, setEscNewPhone] = React.useState("");
 function saveEscalation(patch) {
   var curr = settings.escalation || {enabled:false, modules:{clients:true,jobs:true}, chain:[], timeoutSeconds:30, clientTimeoutMs:35000};
   var next = Object.assign({}, curr, patch);
@@ -108,13 +88,12 @@ function escDragEnd() {
   saveEscalation({chain: escChain});
 }`;
 
-content = content.slice(0, inpClose + 1) + '\n' + escalationHelpers + '\n' + content.slice(inpClose + 1);
-console.log('[add-escalation-settings] PATCH 3: Added escalation helper functions');
+content = content.slice(0, savedEol + 1) + escalationCode + '\n' + content.slice(savedEol + 1);
+console.log('[add-escalation-settings] PATCH 2: Added escalation states + helpers');
 
 // ═══════════════════════════════════════════════════════════════
-// PATCH 4: Add the escalation tab panel JSX
+// PATCH 3: Add the escalation tab panel JSX
 // ═══════════════════════════════════════════════════════════════
-// Insert before: {/* -- SYNC & OFFLINE -- */}
 const syncCommentMarker = '{/* -- SYNC & OFFLINE -- */}';
 const syncCommentIdx = content.indexOf(syncCommentMarker);
 if (syncCommentIdx === -1) {
@@ -178,7 +157,6 @@ const escalationPanel = `{/* -- ESCALATION -- */}
 <div style={{fontSize:11,color:"var(--muted)"}}>{escChain.length} {escChain.length===1?"person":"people"}</div>
 </div>
 
-{/* Chain list with drag handles */}
 {escChain.length === 0 && (
 <div style={{padding:"20px",textAlign:"center",color:"var(--muted)",fontSize:12,border:"1px dashed var(--border)",borderRadius:10,marginBottom:12}}>
 No escalation chain configured. Add people below.
@@ -224,7 +202,7 @@ Drag the {"\u2261"} handle to reorder. Calls go from #1 down.
 `;
 
 content = content.slice(0, syncCommentIdx) + escalationPanel + content.slice(syncCommentIdx);
-console.log('[add-escalation-settings] PATCH 4: Added escalation tab panel JSX');
+console.log('[add-escalation-settings] PATCH 3: Added escalation tab panel JSX');
 
 writeFileSync(file, content);
 console.log('[add-escalation-settings] All escalation settings patches applied successfully!');
