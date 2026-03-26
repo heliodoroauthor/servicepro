@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from 'fs';
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 
-// âââ Helper: find a function body using brace-depth tracking âââ
+// Helper: find a function body using brace-depth tracking
 function findFunctionRange(src, funcName) {
   let marker = 'async function ' + funcName + '(';
   let start = src.indexOf(marker);
@@ -30,9 +30,7 @@ function findFunctionRange(src, funcName) {
   return { start: lineStart, end: i };
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PATCH 1: Add call modal states after the existing 'calling' state
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const callModalStates = `  const [callModal, setCallModal] = useState(null);
   const [callStatus, setCallStatus] = useState("");\n`;
 
@@ -47,17 +45,13 @@ if (callingIdx !== -1) {
   console.warn('[add-call-sms-ui] WARNING: Could not find calling state');
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PATCH 2: Replace callClient with modal-based version
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const newCallClient = `  async function callClient(phone) {
     if(!phone || calling) return;
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    // Clean phone
     let p = phone.replace(/[^+\\d]/g,"");
     if(!p.startsWith("+")) p = p.length===10 ? "+1"+p : "+"+p;
     if(isMobile) {
-      // Mobile: show modal briefly then launch native dialer
       setCallModal({phone:p, name:selC?.name||"Cliente"});
       setCallStatus("Abriendo tel\\u00E9fono...");
       setTimeout(()=>{ window.location.href="tel:"+p; },400);
@@ -77,7 +71,6 @@ const newCallClient = `  async function callClient(phone) {
       const data = await res.json();
       if(!res.ok) throw new Error(data.error||"Error al iniciar llamada");
       setCallStatus("\\u260E\\uFE0F Revisa tu tel\\u00E9fono para contestar");
-      // Auto-close after 15 seconds
       setTimeout(()=>{ setCallModal(null); setCallStatus(""); },15000);
     } catch(e) {
       setCallStatus("\\u274C Error: "+e.message);
@@ -96,10 +89,12 @@ if (callClientRange) {
   process.exit(1);
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PATCH 3: Add call modal overlay JSX before the pets tab marker
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// NOTE: The spin animation <style> uses JSX string syntax to keep CSS braces
+// from being parsed as JSX expressions.
+const spinStyle = "<style>{" + "'@keyframes spin{to{transform:rotate(360deg)}}'" + "}</style>";
 const callModalJSX = `{callModal && <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{setCallModal(null);setCallStatus("");}}>
+              ${spinStyle}
               <div style={{background:"var(--s2,#1e293b)",borderRadius:16,padding:"32px 40px",minWidth:320,maxWidth:400,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)",border:"1px solid var(--border,#334155)"}} onClick={e=>e.stopPropagation()}>
                 <div style={{width:64,height:64,borderRadius:"50%",background:"linear-gradient(135deg,#22c55e,#16a34a)",margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>{calling?"\\u{1F4DE}":"\\u260E\\uFE0F"}</div>
                 <div style={{fontSize:20,fontWeight:700,color:"#f8fafc",marginBottom:4}}>{callModal.name}</div>
@@ -111,19 +106,7 @@ const callModalJSX = `{callModal && <div style={{position:"fixed",top:0,left:0,r
             </div>}
             `;
 
-// Add a spin keyframe animation if not already present
-if (!content.includes('@keyframes spin')) {
-  const styleIdx = content.indexOf('<style>');
-  if (styleIdx !== -1) {
-    const afterStyleTag = styleIdx + '<style>'.length;
-    content = content.slice(0, afterStyleTag) + '\n@keyframes spin{to{transform:rotate(360deg)}}\n' + content.slice(afterStyleTag);
-    console.log('[add-call-sms-ui] Added @keyframes spin');
-  } else {
-    console.warn('[add-call-sms-ui] WARNING: Could not find <style> tag for spin animation');
-  }
-}
-
-// Insert the call modal before the pets tab marker (same approach as add-client-edit.mjs)
+// Insert the call modal before the pets tab marker
 const petsMarker = 'ctab==="pets"';
 const petsIdx = content.indexOf(petsMarker);
 if (petsIdx !== -1) {
@@ -137,26 +120,16 @@ if (petsIdx !== -1) {
   console.warn('[add-call-sms-ui] WARNING: Could not find pets tab marker for modal placement');
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // PATCH 4: Change Text button from native sms: to SMS tab
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// The Text button is multiline:
-//   <button className="client-qa-btn" onClick={()=>selC.phone&&window.open("sms:" + (selC.phone))}>
-//   ð¬ Text
-//   </button>
-// Strategy: find 'client-qa-btn' near "Text" and replace the onClick
 let textBtnFixed = false;
 let searchPos = 0;
 while (!textBtnFixed) {
   const classIdx = content.indexOf('client-qa-btn', searchPos);
   if (classIdx === -1) break;
   const snippet = content.slice(classIdx, classIdx + 200);
-  // Check if this button contains "Text" but NOT "Invoice", "Call", "Editar"
   if (snippet.indexOf('Text') !== -1 && snippet.indexOf('sms:') !== -1) {
-    // Found the Text button with sms: protocol â replace its onClick
     const btnStart = content.lastIndexOf('<button', classIdx);
     if (btnStart !== -1) {
-      // Find the closing </button> after this point
       const textPos = classIdx + snippet.indexOf('Text');
       const closeBtn = content.indexOf('</button>', textPos);
       if (closeBtn !== -1) {
