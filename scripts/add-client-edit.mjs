@@ -94,14 +94,24 @@ if (!fnInserted) {
 }
 
 // PATCH 3: Add "Editar" button after Invoice button
-const invoiceMarker = '\u{1F4C4} Invoice</button>';
-const invoiceIdx = content.indexOf(invoiceMarker);
-if (invoiceIdx !== -1) {
-  const afterInvoice = invoiceIdx + invoiceMarker.length;
-  const editButton = '<button className="client-qa-btn" onClick={startEditClient}>\u270F\uFE0F Editar</button>';
-  content = content.slice(0, afterInvoice) + editButton + content.slice(afterInvoice);
-  console.log('[add-client-edit] PATCH 3: Added Editar button after Invoice');
-} else {
+// Find Invoice</button> that belongs to a client-qa-btn (not "Save as Invoice")
+let invoiceFound = false;
+let searchPos = 0;
+while (true) {
+  const idx = content.indexOf('Invoice</button>', searchPos);
+  if (idx === -1) break;
+  const openTag = content.lastIndexOf('<button', idx);
+  if (openTag !== -1 && content.slice(openTag, idx).includes('client-qa-btn')) {
+    const afterInvoice = idx + 'Invoice</button>'.length;
+    const editButton = '<button className="client-qa-btn" onClick={startEditClient}>\u270F\uFE0F Editar</button>';
+    content = content.slice(0, afterInvoice) + editButton + content.slice(afterInvoice);
+    invoiceFound = true;
+    console.log('[add-client-edit] PATCH 3: Added Editar button after Invoice');
+    break;
+  }
+  searchPos = idx + 1;
+}
+if (!invoiceFound) {
   console.warn('[add-client-edit] WARNING: Could not find Invoice button');
 }
 
