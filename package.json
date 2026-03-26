@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/fix-duplicates.mjs && node scripts/add-csv-import.mjs && node scripts/add-twilio-sms.mjs",
+    "prebuild": "node scripts/fix-duplicates.mjs && node scripts/add-csv-import.mjs && node scripts/add-twilio-sms.mjs && node scripts/add-click-to-call.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
