@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'fs';
 // per-module toggles (Clients/Jobs), and timeout settings.
 // Run AFTER all other patches that touch pages_e.jsx.
 
-const file = 'pages_e.jsx';
+const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 
 // ═══════════════════════════════════════════════════════════════
