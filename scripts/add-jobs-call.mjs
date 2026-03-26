@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from 'fs';
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 
-// âââ Helper: find a function body using brace-depth tracking âââ
+// ─── Helper: find a function body using brace-depth tracking ───
 // Handles destructured parameters like function Foo({a,b,c}) { ... }
 function findFunctionRange(src, funcName) {
   let marker = 'async function ' + funcName + '(';
@@ -18,6 +18,7 @@ function findFunctionRange(src, funcName) {
     start = src.indexOf(marker);
   }
   if (start === -1) return null;
+  // First, skip past the parameter list by finding the matching ')' for '('
   let parenStart = src.indexOf('(', start);
   if (parenStart === -1) return null;
   let parenDepth = 1;
@@ -27,6 +28,7 @@ function findFunctionRange(src, funcName) {
     else if (src[p] === ')') parenDepth--;
     p++;
   }
+  // Now find the opening '{' of the function body (after the closing ')')
   let i = src.indexOf('{', p);
   if (i === -1) return null;
   let depth = 1; i++;
@@ -40,12 +42,19 @@ function findFunctionRange(src, funcName) {
   return { start: lineStart, end: i };
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PATCH 1: Add calling/callModal/callStatus states inside JobsPage
+// ═══════════════════════════════════════════════════════════════
+// Insert after the first useState inside JobsPage — find "function JobsPage" then
+// find the first useState line after it.
+
 const jobsPageRange = findFunctionRange(content, 'JobsPage');
 if (!jobsPageRange) {
   console.error('[add-jobs-call] ERROR: Could not find JobsPage function!');
   process.exit(1);
 }
 
+// Find a good anchor: the "selJob" state line inside JobsPage
 const selJobIdx = content.indexOf('const [selJob, setSelJob] = useState(', jobsPageRange.start);
 if (selJobIdx === -1 || selJobIdx > jobsPageRange.end) {
   console.error('[add-jobs-call] ERROR: Could not find selJob state inside JobsPage!');
@@ -59,6 +68,11 @@ const jobsCallStates = `  const [jobCalling, setJobCalling] = useState(false);
 
 content = content.slice(0, selJobEol + 1) + jobsCallStates + content.slice(selJobEol + 1);
 console.log('[add-jobs-call] PATCH 1: Injected jobCalling/jobCallModal/jobCallStatus states');
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH 2: Add callClientFromJob function inside JobsPage
+// ═══════════════════════════════════════════════════════════════
+// Insert after the "cancelModal" function inside JobsPage (which is defined after openEdit)
 
 const callClientFromJobFn = `  async function callClientFromJob(phone, clientName) {
     if(!phone || jobCalling) return;
@@ -93,8 +107,10 @@ const callClientFromJobFn = `  async function callClientFromJob(phone, clientNam
     }
   }`;
 
+// Find cancelModal inside JobsPage
 const cancelModalIdx = content.indexOf('function cancelModal()', jobsPageRange.start);
 if (cancelModalIdx !== -1 && cancelModalIdx < jobsPageRange.end + 500) {
+  // Find the end of cancelModal — it's a one-liner typically: function cancelModal() { ... }
   let braceStart = content.indexOf('{', cancelModalIdx);
   if (braceStart !== -1) {
     let depth = 1;
@@ -112,55 +128,11 @@ if (cancelModalIdx !== -1 && cancelModalIdx < jobsPageRange.end + 500) {
   process.exit(1);
 }
 
-const jobsPageRange2 = findFunctionRange(content, 'JobsPage');
-
-let jobPhoneFixed = false;
-let searchPos = jobsPageRange2.start;
-while (!jobPhoneFixed) {
-  const telIdx = content.indexOf('window.open("wiar llamada");
-      setJobCallStatus("\\u260E\\uFE0F Revisa tu tel\\u00E9fono para contestar");
-      setTimeout(()=>{ setJobCallModal(null); setJobCallStatus(""); },15000);
-    } catch(e) {
-      setJobCallStatus("\\u274C Error: "+e.message);
-      setTimeout(()=>{ setJobCallModal(null); setJobCallStatus(""); },5000);
-    } finally {
-      setJobCalling(false);
-    }
-  }`;
-
-// Find cancelModal inside JobsPage
-const cancelModalIdx = content.indexOf('function cancelModal()', jobsPageRange.start);
-if (cancelModalIdx !== -1 && cancelModalIdx < jobsPageRange.end + 500) {
-  let braceStart = content.indexOf('{', cancelModalIdx);
-  if (braceStart !== -1) {
-    let depth = 1;
-    let ci = braceStart + 1;
-    while (ci < content.length && depth > 0) {
-      if (content[ci] === '{') depth++;
-      else if (content[ci] === '}') depth--;
-      ci++;
-    }
-    content = content.slice(0, ci) + '\n' + callClientFromJobFn + '\n' + content.slice(ci);
-    console.log('[add-jobs-call] PATCH 2');
-  }
-} else {
-  console.error('[add-jobs-call] ERROR: Could not find cancelModal');
-  process.exit(1);
-}
-
-const jobsPageRange2 = findFunctionRange(content, 'JobsPage');
-
-let jobPhoneFixed = false;
-let searchPos = jobsPageRange2.start;
-while (!jobPhoneFixed) {
-  const telIdx = content.indexOf('window.open("tel:"', searchPos);
-  if (telIdx === -1 || telIdx > jobsPageRange2.end) break;
-  const btnStart = content.lastIndexOf('<button', telIdx);
-  if (btnStart === -1 || btnStart < jobsPageRange2.start) { searchPos = telIdx + 1; continue; }
-  const btnCloseIdx = content.indexOf('</button>', telIdx);
-  if (btnCloseIdx === -1) { searchPos = telIdx + 1; continue; }
-  const fullBtn = content.slice(btnStart, btnCloseIdx + '</button>'.length);
-  if (fullBtn.includes('cl?.phone')n className="client-qa-btn" style={{background:"var(--s2)"}} onClick={()=>cl?.phone&&window.open("tel:" + (cl?.phone))}>
+// ═══════════════════════════════════════════════════════════════
+// PATCH 3: Replace the Jobs phone button (tel:) with callClientFromJob
+// ═══════════════════════════════════════════════════════════════
+// The Jobs phone button pattern:
+//   <button className="client-qa-btn" style={{background:"var(--s2)"}} onClick={()=>cl?.phone&&window.open("tel:" + (cl?.phone))}>
 //   <span> </span>{cl?.phone}
 //   </button>
 // Strategy: Find 'window.open("tel:"' inside the JobsPage range, then replace that button.
@@ -174,7 +146,7 @@ while (!jobPhoneFixed) {
   const telIdx = content.indexOf('window.open("tel:"', searchPos);
   if (telIdx === -1 || telIdx > jobsPageRange2.end) break;
 
-  // This is within JobsPage â find the enclosing button
+  // This is within JobsPage — find the enclosing button
   const btnStart = content.lastIndexOf('<button', telIdx);
   if (btnStart === -1 || btnStart < jobsPageRange2.start) { searchPos = telIdx + 1; continue; }
 
@@ -196,9 +168,9 @@ if (!jobPhoneFixed) {
   console.warn('[add-jobs-call] WARNING: Could not find Jobs phone button with tel: protocol');
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ═══════════════════════════════════════════════════════════════
 // PATCH 4: Replace the Jobs message button (sms:) with Twilio SMS
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ═══════════════════════════════════════════════════════════════
 // The Jobs message button pattern:
 //   <button className="client-qa-btn" style={{background:"var(--s2)"}} onClick={()=>cl?.phone&&window.open("sms:" + (cl?.phone))}>
 //   <span> </span>Message
@@ -233,9 +205,9 @@ if (!jobMsgFixed) {
   console.warn('[add-jobs-call] WARNING: Could not find Jobs message button with sms: protocol');
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ═══════════════════════════════════════════════════════════════
 // PATCH 5: Add call modal overlay JSX inside JobsPage
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ═══════════════════════════════════════════════════════════════
 // Insert before {/* SCHEDULE */} comment inside JobsPage's job detail view
 // which comes right after the client section
 
@@ -262,9 +234,9 @@ if (scheduleIdx !== -1 && scheduleIdx < jobsPageRange4.end) {
   console.warn('[add-jobs-call] WARNING: Could not find SCHEDULE comment for modal placement');
 }
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ═══════════════════════════════════════════════════════════════
 // PATCH 6: Also fix the "View client details" modal phone link
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ═══════════════════════════════════════════════════════════════
 // The job-view-client modal has: <a href={"tel:" + (cl?.phone)} ...>
 // Replace with a button that calls callClientFromJob
 
