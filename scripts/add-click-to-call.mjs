@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from 'fs';
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 
-// Helper: find a function body using brace-depth tracking
+// âââ Helper: find a function body using brace-depth tracking âââ
 function findFunctionRange(src, funcName) {
   // Try async version first
   let marker = 'async function ' + funcName + '(';
@@ -32,8 +32,8 @@ function findFunctionRange(src, funcName) {
   return { start: lineStart, end: i };
 }
 
-// PATCH 1: Add calling state
-const callingState = '  const [calling, setCalling] = useState(false);\n';
+// âââ PATCH 1: Add calling state âââ
+const callingState = `  const [calling, setCalling] = useState(false);\n`;
 
 // Insert after smsSending state (injected by add-twilio-sms.mjs)
 let stateInjected = false;
@@ -47,6 +47,7 @@ if (smsSendingIdx !== -1) {
   }
 }
 if (!stateInjected) {
+  // Fallback: insert after smsError state
   const smsErrorIdx = content.indexOf('const [smsError, setSmsError] = useState(');
   if (smsErrorIdx !== -1) {
     const eol = content.indexOf('\n', smsErrorIdx);
@@ -58,6 +59,7 @@ if (!stateInjected) {
   }
 }
 if (!stateInjected) {
+  // Last resort: before sendSms function
   const range = findFunctionRange(content, 'sendSms');
   if (range) {
     content = content.slice(0, range.start) + callingState + content.slice(range.start);
@@ -67,7 +69,7 @@ if (!stateInjected) {
   }
 }
 
-// PATCH 2: Add callClient function after sendSms
+// âââ PATCH 2: Add callClient function after sendSms âââ
 const callClientFn = `  async function callClient(phone) {
     if(!phone || calling) return;
     // Mobile: use native tel: protocol
@@ -78,7 +80,7 @@ const callClientFn = `  async function callClient(phone) {
       window.location.href = "tel:" + p;
       return;
     }
-    // Desktop: Twilio callback — rings your phone, then connects to client
+    // Desktop: Twilio callback â rings your phone, then connects to client
     setCalling(true);
     try {
       const res = await fetch("/api/make-call", {
@@ -88,7 +90,7 @@ const callClientFn = `  async function callClient(phone) {
       });
       const data = await res.json();
       if(!res.ok) throw new Error(data.error||"Error al iniciar llamada");
-      alert("Llamada iniciada — revisa tu telefono para contestar.");
+      alert("Llamada iniciada â revisa tu telefono para contestar.");
     } catch(e) {
       alert("Error: "+e.message);
     } finally {
@@ -105,27 +107,42 @@ if (sendSmsRange) {
   process.exit(1);
 }
 
-// PATCH 3: Wire up the Call button
-// The button is: <button className="client-qa-btn">\u{1F4DE} Call</button>
-const callBtnText = '\u{1F4DE} Call</button>';
-const btnTextIdx = content.indexOf(callBtnText);
-if (btnTextIdx !== -1) {
-  let openTag = content.lastIndexOf('<button', btnTextIdx);
-  if (openTag !== -1) {
-    const fullBtn = content.slice(openTag, btnTextIdx + callBtnText.length);
-    const closingBracket = fullBtn.indexOf('>');
-    if (closingBracket !== -1) {
-      const beforeClose = fullBtn.slice(0, closingBracket);
-      const newBtn = beforeClose
-        + ' onClick={()=>callClient(selC?.phone)} disabled={calling}'
-        + '>{calling?"\u23F3 Llamando...":"\u{1F4DE} Call"}</button>';
-      content = content.slice(0, openTag) + newBtn + content.slice(openTag + fullBtn.length);
-      console.log('[add-click-to-call] Wired up Call button with onClick handler');
+// âââ PATCH 3: Wire up the Call button âââ
+// The Call button is multiline in the JSX source:
+//   <button className="client-qa-btn">
+//   ð Call
+//   </button>
+// Strategy: find each 'client-qa-btn' occurrence, check if "Call" appears
+// nearby but NOT "Invoice", "Text", "Editar", then replace the whole button.
+let callBtnFixed = false;
+let callSearchPos = 0;
+while (!callBtnFixed) {
+  const classIdx = content.indexOf('client-qa-btn', callSearchPos);
+  if (classIdx === -1) break;
+  const snippet = content.slice(classIdx, classIdx + 200);
+  // Check if this button contains "Call" but NOT other button labels
+  if (snippet.indexOf('Call') !== -1 && snippet.indexOf('Invoice') === -1
+      && snippet.indexOf('Text') === -1 && snippet.indexOf('Editar') === -1
+      && snippet.indexOf('sms:') === -1) {
+    const btnStart = content.lastIndexOf('<button', classIdx);
+    if (btnStart !== -1) {
+      const callPos = classIdx + snippet.indexOf('Call');
+      const closeBtn = content.indexOf('</button>', callPos);
+      if (closeBtn !== -1) {
+        const fullBtn = content.slice(btnStart, closeBtn + '</button>'.length);
+        const newCallBtn = '<button className="client-qa-btn" onClick={()=>callClient(selC?.phone)} disabled={calling}>\n{calling?"\\u23F3 Llamando...":"\\u{1F4DE} Call"}\n</button>';
+        content = content.slice(0, btnStart) + newCallBtn + content.slice(btnStart + fullBtn.length);
+        callBtnFixed = true;
+        console.log('[add-click-to-call] PATCH 3: Wired up Call button with onClick handler');
+      }
     }
   }
-} else {
-  console.warn('[add-click-to-call] WARNING: Could not find Call button');
+  callSearchPos = classIdx + 1;
+}
+if (!callBtnFixed) {
+  console.warn('[add-click-to-call] WARNING: Could not find Call button with client-qa-btn class');
 }
 
 writeFileSync(file, content);
 console.log('[add-click-to-call] All click-to-call patches applied successfully!');
+
