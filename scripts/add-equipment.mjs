@@ -25,9 +25,9 @@ function findBlockEnd(src, startIdx) {
 function findConditionalBlockEnd(src, marker) {
   const idx = src.indexOf(marker);
   if (idx === -1) return -1;
-  // Find the opening ( of the JSX conditional {marker && (...)}
-  const parenStart = src.indexOf('(', idx + marker.length);
-  if (parenStart === -1) return -1;
+  // The marker ends with '(' — track from that paren directly
+  const parenStart = idx + marker.length - 1;
+  if (src[parenStart] !== '(') return -1;
   let depth = 1;
   let i = parenStart + 1;
   while (i < src.length && depth > 0) {
@@ -72,7 +72,7 @@ const equipmentState = `
   var EQ_PRESETS = [
     {id:"controller",name:"Controller",icon:"🎛"},{id:"backflow",name:"Backflow Preventer",icon:"🔄"},
     {id:"valve",name:"Valve",icon:"🔧"},{id:"timer",name:"Timer",icon:"⏱"},
-    {id:"pump",name:"Pump",icon:"⟽"},{id:"filter",name:"Filter",icon:"🧹"},
+    {id:"pump",name:"Pump",icon:"⛽"},{id:"filter",name:"Filter",icon:"🧹"},
     {id:"meter",name:"Meter",icon:"📊"},{id:"sprinkler",name:"Sprinkler Head",icon:"💧"},
     {id:"drain",name:"Drain",icon:"🕳"},{id:"pipe",name:"Pipe / Fitting",icon:"🔩"},
     {id:"sensor",name:"Sensor",icon:"📡"},{id:"custom",name:"Custom",icon:"✏️"}
@@ -266,7 +266,7 @@ return(
 
 <div style={{display:"flex",gap:8,marginTop:10}}>
 <button onClick={function(e){e.stopPropagation();startEditEquip(item);}} style={{background:"var(--surface)",color:"var(--blue)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>✏️ Edit</button>
-<button onClick={function(e){e.stopPropagation();if(confirm("Remove "+item.name+"?"))deleteEquipItem(sel,item.id);}} style={{background:"var(--surface)",color:"var(--red)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>👑 Remove</button>
+<button onClick={function(e){e.stopPropagation();if(confirm("Remove "+item.name+"?"))deleteEquipItem(sel,item.id);}} style={{background:"var(--surface)",color:"var(--red)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>🗑 Remove</button>
 </div>
 </div>
 )}
