@@ -11,9 +11,8 @@ const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 const original = content;
 
-// ── STEP 1: Inject a comprehensive mobile CSS block into index.css ──
-const cssFile = 'src/index.css';
-let css = readFileSync(cssFile, 'utf8');
+// ── STEP 1: Inject mobile CSS into the <style> tag inside ServiceProApp.jsx ──
+// NOTE: index.css is NOT imported by main.jsx — all CSS lives inside a <style> tag in the JSX
 
 const mobileCss = `
 /* ═══════════════════════════════════════════════════════
@@ -461,9 +460,27 @@ const mobileCss = `
 }
 `;
 
-css += mobileCss;
-writeFileSync(cssFile, css);
-console.log('[add-mobile-responsive] Injected mobile CSS into index.css (' + mobileCss.length + ' chars)');
+// Inject mobile CSS into the <style> tag in ServiceProApp.jsx
+const styleIdx = content.indexOf('<style>');
+if (styleIdx !== -1) {
+  const afterStyleTag = styleIdx + '<style>'.length;
+  // Minify the mobile CSS: strip comments, collapse whitespace
+  const minified = mobileCss
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // strip comments
+    .replace(/\n\s*/g, '\n')           // collapse leading whitespace
+    .replace(/\n+/g, '\n')             // collapse blank lines
+    .replace(/\s*\{\s*/g, '{')         // collapse around {
+    .replace(/\s*\}\s*/g, '}')         // collapse around }
+    .replace(/\s*;\s*/g, ';')          // collapse around ;
+    .replace(/\s*:\s*/g, ':')          // collapse around :
+    .replace(/\s*,\s*/g, ',')          // collapse around ,
+    .trim();
+  content = content.slice(0, afterStyleTag) + '\n' + minified + '\n' + content.slice(afterStyleTag);
+  console.log('[add-mobile-responsive] Injected mobile CSS into <style> tag (' + minified.length + ' chars)');
+} else {
+  console.error('[add-mobile-responsive] ERROR: Could not find <style> tag in JSX!');
+  process.exit(1);
+}
 
 // ── STEP 2: Patch inline styles in ServiceProApp.jsx that cause overflow ──
 
@@ -517,7 +534,7 @@ content = content.replace(
 patchCount++;
 
 content = content.replace(
-  /gridTemplateColumns:'repeat\(auto-fill,minmax\(280px,1fr\)\)"/g,
+  /gridTemplateColumns:"repeat\(auto-fill,minmax\(280px,1fr\)\)"/g,
   'gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))"'
 );
 patchCount++;
@@ -535,7 +552,7 @@ content = content.replace(
 patchCount++;
 
 content = content.replace(
-  /gridTemplateColumns:'repeat\(auto-fill,minmax\(190px,1fr\)\)"/g,
+  /gridTemplateColumns:"repeat\(auto-fill,minmax\(190px,1fr\)\)"/g,
   'gridTemplateColumns:"repeat(auto-fill,minmax(min(190px,100%),1fr))"'
 );
 patchCount++;
