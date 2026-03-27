@@ -4,8 +4,8 @@ const file = 'src/ServiceProApp.jsx';
 let c = readFileSync(file, 'utf8');
 
 if (c.includes('TieredOptions')) {
-  console.log('[add-tier-ui] Already wired up, skipping.');
-  process.exit(0);
+    console.log('[add-tier-ui] Already wired up, skipping.');
+    process.exit(0);
 }
 
 // 1. Add import after the React import line
@@ -24,15 +24,12 @@ const stateEnd = stateIdx + stateAnchor.length;
 c = c.substring(0, stateEnd) + '\nconst [enableTiers, setEnableTiers] = useState(false);\nconst [tierItems, setTierItems] = useState({basic:[],standard:[],premium:[]});' + c.substring(stateEnd);
 console.log('[add-tier-ui] Step 2: Added tier state variables.');
 
-// 3. Add TieredOptions component before the closing of the items block
-const tdAnchor = '["Total","$0.00"],["Due","$0.00"]';
-const tdIdx = c.indexOf(tdAnchor);
-if (tdIdx === -1) { console.log('[add-tier-ui] Cannot find Total/Due section.'); process.exit(0); }
-const closeTag = '</>' + ')}';
-const insertAt = c.indexOf(closeTag, tdIdx);
-if (insertAt === -1) { console.log('[add-tier-ui] Cannot find items block closing.'); process.exit(0); }
-c = c.substring(0, insertAt) + '<TieredOptions enableTiers={enableTiers} setEnableTiers={setEnableTiers} tierItems={tierItems} setTierItems={setTierItems}/>\n' + c.substring(insertAt);
-console.log('[add-tier-ui] Step 3: Added TieredOptions component to items section.');
+// 3. Add TieredOptions component right before the EXPANDABLE SECTIONS comment
+const sectionAnchor = '{/* -- EXPANDABLE SECTIONS -- */}';
+const sectionIdx = c.indexOf(sectionAnchor);
+if (sectionIdx === -1) { console.log('[add-tier-ui] Cannot find EXPANDABLE SECTIONS comment.'); process.exit(0); }
+c = c.substring(0, sectionIdx) + '<TieredOptions enableTiers={enableTiers} setEnableTiers={setEnableTiers} tierItems={tierItems} setTierItems={setTierItems}/>\n' + c.substring(sectionIdx);
+console.log('[add-tier-ui] Step 3: Added TieredOptions before expandable sections.');
 
 writeFileSync(file, c);
 console.log('[add-tier-ui] Done! File written.');
