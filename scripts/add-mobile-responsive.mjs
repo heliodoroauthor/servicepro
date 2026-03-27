@@ -1,17 +1,17 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// ————————————————————————————————————————————————————————————
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // add-mobile-responsive.mjs
 // Comprehensive mobile-first responsive optimization
 // Injects CSS media queries into index.html + patches inline styles
 // in ServiceProApp.jsx that cause horizontal overflow on small screens
-// ————————————————————————————————————————————————————————————
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 const original = content;
 
-// — STEP 1: Define mobile CSS —
+// â STEP 1: Define mobile CSS â
 
 const mobileCss = `
 /* MOBILE-FIRST RESPONSIVE OVERHAUL */
@@ -64,8 +64,8 @@ const mobileCss = `
   .btn{min-height:44px!important;min-width:44px!important;font-size:14px!important;padding:10px 16px!important;border-radius:8px!important}
   .btn-sm{min-height:38px!important;font-size:13px!important;padding:8px 12px!important}
   .btn-lg{min-height:50px!important;font-size:16px!important;padding:12px 20px!important;width:100%!important}
-  .action-btn{min-height:44px!important;padding:10px!important;font-size:13px!important;flex:1 1 auto!important}
-  .action-btn-icon{font-size:18px!important}
+  .page>:not(.detail-screen) .action-btn{min-height:44px!important;padding:10px!important;font-size:13px!important;flex:1 1 auto!important}
+  .page>:not(.detail-screen) .action-btn-icon{font-size:18px!important}
   .wf-btn{min-height:44px!important;padding:10px 14px!important;font-size:13px!important}
   .wf-actions{flex-wrap:wrap!important;gap:6px!important}
   .fab{position:fixed!important;bottom:80px!important;right:16px!important;z-index:9998!important;min-width:48px!important;min-height:48px!important;border-radius:50%!important}
@@ -86,8 +86,6 @@ const mobileCss = `
   .pdt-btn{font-size:12px!important;padding:8px 10px!important;white-space:nowrap!important}
 
   .job-card{width:100%!important;box-sizing:border-box!important}
-  .job-map{height:150px!important;border-radius:8px!important}
-  .job-map-addr{font-size:12px!important}
 
   .sched-header{flex-wrap:wrap!important;gap:8px!important}
   .cal-grid{font-size:10px!important;gap:1px!important;width:100%!important;table-layout:fixed!important}
@@ -100,8 +98,8 @@ const mobileCss = `
   .client-hero{flex-direction:column!important;text-align:center!important;gap:8px!important;padding:12px!important}
   .client-hero-name{font-size:18px!important}
   .client-row{flex-direction:column!important;gap:4px!important}
-  .client-qa{width:100%!important;flex-wrap:wrap!important;gap:6px!important}
-  .client-qa-btn{flex:1 1 auto!important;min-height:44px!important;font-size:13px!important}
+  .page>.split-client .client-qa{width:100%!important;flex-wrap:wrap!important;gap:6px!important}
+  .page>.split-client .client-qa-btn{flex:1 1 auto!important;min-height:44px!important;font-size:13px!important}
   .info-row{flex-direction:column!important;gap:2px!important;padding:8px 0!important}
   .info-val{font-size:14px!important;word-break:break-word!important}
 
@@ -112,11 +110,6 @@ const mobileCss = `
   .stock-table{overflow-x:auto!important;max-width:100%!important;-webkit-overflow-scrolling:touch!important}
   th,td{padding:6px 8px!important;font-size:12px!important;white-space:nowrap!important}
 
-  .detail-screen{width:100%!important;max-width:100%!important;min-width:0!important}
-  .detail-topbar{flex-wrap:wrap!important;gap:8px!important;padding:10px!important}
-  .detail-title{font-size:16px!important}
-  .detail-body{padding:10px!important}
-  .action-row{display:flex!important;flex-wrap:wrap!important;gap:6px!important;width:100%!important}
 
   .crm-board{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important}
   .crm-col{width:100%!important;min-width:0!important;max-width:100%!important}
@@ -133,9 +126,9 @@ const mobileCss = `
   .upload-zone{width:100%!important;padding:20px!important}
   .upload-zone-label{font-size:13px!important}
 
-  .expand-header{flex-wrap:wrap!important;gap:8px!important}
-  .expand-header-left{min-width:0!important;flex:1!important}
-  .badge{font-size:10px!important;padding:2px 6px!important}
+  .page>:not(.detail-screen) .expand-header{flex-wrap:wrap!important;gap:8px!important}
+  .page>:not(.detail-screen) .expand-header-left{min-width:0!important;flex:1!important}
+  .page>:not(.detail-screen) .badge{font-size:10px!important;padding:2px 6px!important}
   .mobile-list-item{padding:12px!important}
   .mli-name{font-size:14px!important}
   .mli-amt{font-size:14px!important}
@@ -159,7 +152,7 @@ const mobileCss = `
 }
 `;
 
-// — STEP 2: Inject mobile CSS into index.html (NOT into JSX to avoid esbuild parse errors) —
+// â STEP 2: Inject mobile CSS into index.html (NOT into JSX to avoid esbuild parse errors) â
 
 const MARKER_START = '<!-- ==MOBILE-RESPONSIVE-START== -->';
 const MARKER_END = '<!-- ==MOBILE-RESPONSIVE-END== -->';
@@ -209,7 +202,7 @@ try {
   process.exit(1);
 }
 
-// — STEP 3: Remove any previously injected mobile CSS from JSX (cleanup) —
+// â STEP 3: Remove any previously injected mobile CSS from JSX (cleanup) â
 
 const JSX_MARKER_START = '/* ==MOBILE-RESPONSIVE-START== */';
 const JSX_MARKER_END = '/* ==MOBILE-RESPONSIVE-END== */';
@@ -221,7 +214,7 @@ if (content.includes(JSX_MARKER_START)) {
   console.log('[add-mobile-responsive] Cleaned up previously injected CSS from JSX.');
 }
 
-// — STEP 4: Patch inline styles that cause horizontal overflow —
+// â STEP 4: Patch inline styles that cause horizontal overflow â
 
 let patchCount = 0;
 
@@ -238,7 +231,7 @@ content = content.replace(
 
 console.log(`[add-mobile-responsive] Patched ${patchCount} inline styles.`);
 
-// — STEP 5: Write the patched JSX —
+// â STEP 5: Write the patched JSX â
 if (content !== original) {
   writeFileSync(file, content);
   console.log(`[add-mobile-responsive] Inline patches written to ${file}`);
