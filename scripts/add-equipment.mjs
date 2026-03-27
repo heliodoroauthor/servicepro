@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync } from 'fs';
 
 // This script patches ServiceProApp.jsx to add an Equipment Location Log
 // module on both Client profile and Job detail views.
-// Equipment items (controller, valve, backflow, etc.) are stored per-client
-// in localStorage, with photo uploads via Cloudinary.
+// Optimized for field technicians: checklist workflow, brand/model fields,
+// mobile-first vertical layout, photo uploads via Cloudinary.
 
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
@@ -25,7 +25,6 @@ function findBlockEnd(src, startIdx) {
 function findConditionalBlockEnd(src, marker) {
   const idx = src.indexOf(marker);
   if (idx === -1) return -1;
-  // The marker ends with '(' — track from that paren directly
   const parenStart = idx + marker.length - 1;
   if (src[parenStart] !== '(') return -1;
   let depth = 1;
@@ -35,7 +34,6 @@ function findConditionalBlockEnd(src, marker) {
     else if (src[i] === ')') depth--;
     i++;
   }
-  // Now we're at the closing ), skip the }
   while (i < src.length && src[i] !== '}') i++;
   if (src[i] === '}') i++;
   return i;
@@ -68,24 +66,32 @@ if (ctabIdx === -1) {
 const ctabEol = content.indexOf('\n', ctabIdx);
 
 const equipmentState = `
-  // ── Equipment Location Log state ──
+  // ── Equipment Checklist state ──
   var EQ_PRESETS = [
-    {id:"controller",name:"Controller",icon:"🎛"},{id:"backflow",name:"Backflow Preventer",icon:"🔄"},
-    {id:"valve",name:"Valve",icon:"🔧"},{id:"timer",name:"Timer",icon:"⏱"},
-    {id:"pump",name:"Pump",icon:"⛽"},{id:"filter",name:"Filter",icon:"🧹"},
-    {id:"meter",name:"Meter",icon:"📊"},{id:"sprinkler",name:"Sprinkler Head",icon:"💧"},
-    {id:"drain",name:"Drain",icon:"🕳"},{id:"pipe",name:"Pipe / Fitting",icon:"🔩"},
-    {id:"sensor",name:"Sensor",icon:"📡"},{id:"custom",name:"Custom",icon:"✏️"}
+    {id:"controller",name:"Controller",icon:"🎛",hint:"Irrigation controller / timer box"},
+    {id:"backflow",name:"Backflow Preventer",icon:"🔄",hint:"RPZ, PVB, or double-check valve"},
+    {id:"valve",name:"Valve",icon:"🔧",hint:"Zone valve, master valve, shut-off"},
+    {id:"rain_sensor",name:"Rain Sensor",icon:"🌧",hint:"Rain or soil-moisture sensor"},
+    {id:"timer",name:"Timer",icon:"⏱",hint:"Standalone timer or smart timer"},
+    {id:"pump",name:"Pump",icon:"⛽",hint:"Booster pump, well pump"},
+    {id:"filter",name:"Filter",icon:"🧹",hint:"Inline filter, Y-strainer, disc filter"},
+    {id:"meter",name:"Meter",icon:"📊",hint:"Water meter, flow sensor"},
+    {id:"sprinkler",name:"Sprinkler Head",icon:"💧",hint:"Pop-up, rotor, drip emitter"},
+    {id:"drain",name:"Drain",icon:"🕳",hint:"French drain, catch basin, channel"},
+    {id:"pipe",name:"Pipe / Fitting",icon:"🔩",hint:"Main line, lateral, coupling"},
+    {id:"sensor",name:"Sensor",icon:"📡",hint:"Flow sensor, pressure sensor"},
+    {id:"custom",name:"Custom",icon:"✏️",hint:"Other equipment not listed"}
   ];
   var EQ_STORAGE_KEY = "sp_client_equipment_v1";
   function loadAllEquip() { try { return JSON.parse(localStorage.getItem(EQ_STORAGE_KEY)||"{}"); } catch(e){ return {}; } }
   function saveAllEquip(d) { try { localStorage.setItem(EQ_STORAGE_KEY, JSON.stringify(d)); } catch(e){} }
   var [allEquip, setAllEquip] = React.useState(loadAllEquip);
-  var [eqForm, setEqForm] = React.useState({name:"",category:"",description:"",location:""});
+  var [eqForm, setEqForm] = React.useState({name:"",category:"",description:"",location:"",brand:"",model:""});
   var [eqPhotos, setEqPhotos] = React.useState([]);
   var [eqUploading, setEqUploading] = React.useState(false);
   var [eqEditId, setEqEditId] = React.useState(null);
   var [eqExpanded, setEqExpanded] = React.useState(null);
+  var [eqMode, setEqMode] = React.useState("checklist");
   var eqFileRef = React.useRef();
 
   function getClientEquip(clientId) { return (allEquip[clientId] || []); }
@@ -96,12 +102,12 @@ const equipmentState = `
     if (eqEditId) {
       items = items.map(function(it){ return it.id === eqEditId ? Object.assign({}, it, eqForm, {photos: eqPhotos}) : it; });
     } else {
-      items.push({id:"eq_"+Date.now(), name:eqForm.name, category:eqForm.category, description:eqForm.description, location:eqForm.location, photos:eqPhotos, addedDate:new Date().toISOString().slice(0,10)});
+      items.push({id:"eq_"+Date.now(), name:eqForm.name, category:eqForm.category, description:eqForm.description, location:eqForm.location, brand:eqForm.brand, model:eqForm.model, photos:eqPhotos, addedDate:new Date().toISOString().slice(0,10), status:"documented"});
     }
     var next = Object.assign({}, allEquip, {[clientId]: items});
     setAllEquip(next);
     saveAllEquip(next);
-    setEqForm({name:"",category:"",description:"",location:""});
+    setEqForm({name:"",category:"",description:"",location:"",brand:"",model:""});
     setEqPhotos([]);
     setEqEditId(null);
   }
@@ -111,19 +117,21 @@ const equipmentState = `
     var next = Object.assign({}, allEquip, {[clientId]: items});
     setAllEquip(next);
     saveAllEquip(next);
-    if (eqEditId === itemId) { setEqEditId(null); setEqForm({name:"",category:"",description:"",location:""}); setEqPhotos([]); }
+    if (eqEditId === itemId) { setEqEditId(null); setEqForm({name:"",category:"",description:"",location:"",brand:"",model:""}); setEqPhotos([]); }
   }
 
   function startEditEquip(item) {
     setEqEditId(item.id);
-    setEqForm({name:item.name, category:item.category||"", description:item.description||"", location:item.location||""});
+    setEqMode("form");
+    setEqForm({name:item.name, category:item.category||"", description:item.description||"", location:item.location||"", brand:item.brand||"", model:item.model||""});
     setEqPhotos(item.photos||[]);
   }
 
   function cancelEditEquip() {
     setEqEditId(null);
-    setEqForm({name:"",category:"",description:"",location:""});
+    setEqForm({name:"",category:"",description:"",location:"",brand:"",model:""});
     setEqPhotos([]);
+    setEqMode("checklist");
   }
 
   async function uploadEqPhoto(e) {
@@ -159,6 +167,7 @@ const equipmentState = `
 
   function selectPreset(preset) {
     setEqForm(function(p){ return Object.assign({}, p, {name: preset.name, category: preset.id}); });
+    setEqMode("form");
   }
 `;
 
@@ -168,7 +177,6 @@ console.log('[add-equipment] PATCH 2: Injected equipment state + helpers after c
 // ════════════════════════════════════════════
 // PATCH 3: Add Equipment tab content in Client detail
 // ════════════════════════════════════════════
-// Find the end of the subscription tab conditional block
 const subMarker = '{ctab==="subscription" && (';
 const subBlockEnd = findConditionalBlockEnd(content, subMarker);
 if (subBlockEnd === -1) {
@@ -178,103 +186,197 @@ if (subBlockEnd === -1) {
 
 const clientEquipContent = `
 {ctab==="equipment" && (
-<div>
-<div style={{fontSize:9,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Equipment Location Log</div>
-<div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>Document installed equipment, components, and their locations at this property.</div>
+<div style={{maxWidth:540,margin:"0 auto"}}>
 
-{/* PRESET QUICK-ADD */}
+{/* HEADER */}
+<div style={{textAlign:"center",padding:"8px 0 12px"}}>
+<div style={{fontSize:22,marginBottom:2}}>🔧</div>
+<div style={{fontSize:11,fontWeight:800,color:"var(--text)",textTransform:"uppercase",letterSpacing:1.5}}>Equipment Checklist</div>
+<div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>Tap a category to document each piece of equipment at this property.</div>
+</div>
+
+{/* MODE TOGGLE */}
+<div style={{display:"flex",gap:0,marginBottom:14,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)"}}>
+<button onClick={function(){setEqMode("checklist");cancelEditEquip();}} style={{flex:1,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer",border:"none",background:eqMode==="checklist"?"var(--orange)":"var(--s2)",color:eqMode==="checklist"?"#fff":"var(--muted)"}}>📋 Checklist</button>
+<button onClick={function(){setEqMode("form");}} style={{flex:1,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer",border:"none",background:eqMode==="form"?"var(--orange)":"var(--s2)",color:eqMode==="form"?"#fff":"var(--muted)"}}>＋ Add Item</button>
+<button onClick={function(){setEqMode("list");}} style={{flex:1,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer",border:"none",background:eqMode==="list"?"var(--orange)":"var(--s2)",color:eqMode==="list"?"#fff":"var(--muted)"}}>📄 Log ({getClientEquip(sel).length})</button>
+</div>
+
+{/* ── CHECKLIST MODE ── */}
+{eqMode==="checklist" && (
+<div>
+<div style={{fontSize:10,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontWeight:700}}>Tap to document each item</div>
+{EQ_PRESETS.map(function(pr){
+var logged = getClientEquip(sel).filter(function(it){return it.category===pr.id;});
+var hasItem = logged.length > 0;
+return(
+<div key={pr.id} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",marginBottom:6,background:hasItem?"rgba(255,140,0,.08)":"var(--s2)",border:"1px solid "+(hasItem?"var(--orange)":"var(--border)"),borderRadius:12,cursor:"pointer"}} onClick={function(){if(!hasItem){selectPreset(pr);}else{setEqMode("list");setEqExpanded(logged[0].id);}}}>
+<div style={{fontSize:24,width:36,textAlign:"center",flexShrink:0}}>{pr.icon}</div>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{pr.name}</div>
+<div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{pr.hint}</div>
+{hasItem && <div style={{fontSize:10,color:"var(--orange)",fontWeight:700,marginTop:3}}>✓ {logged.length} documented</div>}
+</div>
+<div style={{flexShrink:0}}>
+{hasItem ? (
+<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800}}>✓</div>
+) : (
+<div style={{background:"var(--surface)",border:"2px dashed var(--border)",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"var(--muted)"}}>+</div>
+)}
+</div>
+</div>
+);})}
+
+{/* PROGRESS BAR */}
+{(function(){
+var total = EQ_PRESETS.length;
+var done = EQ_PRESETS.filter(function(pr){return getClientEquip(sel).some(function(it){return it.category===pr.id;});}).length;
+var pct = total>0?Math.round((done/total)*100):0;
+return(
+<div style={{marginTop:14,padding:"12px 16px",background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+<span style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>Site Survey Progress</span>
+<span style={{fontSize:12,fontWeight:800,color:pct===100?"var(--green)":"var(--orange)"}}>{pct}%</span>
+</div>
+<div style={{height:8,background:"var(--surface)",borderRadius:4,overflow:"hidden"}}>
+<div style={{height:"100%",width:pct+"%",background:pct===100?"var(--green)":"var(--orange)",borderRadius:4,transition:"width .3s"}}></div>
+</div>
+<div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>{done} of {total} categories documented · {getClientEquip(sel).length} total items</div>
+</div>
+);
+})()}
+</div>
+)}
+
+{/* ── FORM MODE ── */}
+{eqMode==="form" && (
+<div>
+{/* CATEGORY SELECTOR (scrollable chips) */}
+<div style={{fontSize:10,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:700}}>{eqEditId ? "Editing Item" : "Select Category"}</div>
 <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
 {EQ_PRESETS.map(function(pr){return(
-<button key={pr.id} onClick={function(){selectPreset(pr);}} style={{background:eqForm.category===pr.id?"var(--orange)":"var(--s2)",color:eqForm.category===pr.id?"#fff":"var(--muted)",border:"1px solid "+(eqForm.category===pr.id?"var(--orange)":"var(--border)"),borderRadius:20,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+<button key={pr.id} onClick={function(){selectPreset(pr);}} style={{background:eqForm.category===pr.id?"var(--orange)":"var(--s2)",color:eqForm.category===pr.id?"#fff":"var(--muted)",border:"1px solid "+(eqForm.category===pr.id?"var(--orange)":"var(--border)"),borderRadius:20,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
 <span>{pr.icon}</span>{pr.name}
 </button>
 );})}
 </div>
 
-{/* ADD / EDIT FORM */}
-<div style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:16}}>
-<div style={{fontSize:11,fontWeight:700,color:"var(--text)",marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{eqEditId ? "Edit Item" : "Add Equipment"}</div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-<input className="inp" value={eqForm.name} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{name:e.target.value});});}} placeholder="Name (e.g. Controller)" style={{fontSize:12}}/>
-<input className="inp" value={eqForm.location} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{location:e.target.value});});}} placeholder="Location (e.g. North wall)" style={{fontSize:12}}/>
+{/* FORM FIELDS — mobile vertical stack */}
+<div style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12,padding:16,marginBottom:14}}>
+<div style={{display:"flex",flexDirection:"column",gap:10}}>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Equipment Name *</div>
+<input className="inp" value={eqForm.name} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{name:e.target.value});});}} placeholder="e.g. Hunter Pro-C Controller" style={{fontSize:14,padding:"12px 14px",width:"100%",boxSizing:"border-box"}}/>
 </div>
-<textarea className="inp" value={eqForm.description} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{description:e.target.value});});}} placeholder="Description, model, brand, serial number..." rows={2} style={{fontSize:12,marginBottom:8,width:"100%",boxSizing:"border-box"}}/>
 
-{/* PHOTO UPLOAD */}
-<div style={{marginBottom:8}}>
-<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-<input ref={eqFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={uploadEqPhoto}/>
-<button onClick={function(){eqFileRef.current.click();}} disabled={eqUploading} style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer",color:"var(--text)",opacity:eqUploading?.5:1}}>
-{eqUploading ? "Uploading..." : "📷 Add Photo"}
-</button>
-<span style={{fontSize:10,color:"var(--muted)"}}>{eqPhotos.length} photo{eqPhotos.length!==1?"s":""}</span>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Exact Location</div>
+<input className="inp" value={eqForm.location} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{location:e.target.value});});}} placeholder="e.g. Garage north wall, left side" style={{fontSize:14,padding:"12px 14px",width:"100%",boxSizing:"border-box"}}/>
 </div>
+
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Brand</div>
+<input className="inp" value={eqForm.brand} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{brand:e.target.value});});}} placeholder="e.g. Hunter" style={{fontSize:13,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Model</div>
+<input className="inp" value={eqForm.model} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{model:e.target.value});});}} placeholder="e.g. Pro-C" style={{fontSize:13,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+</div>
+
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Notes / Description</div>
+<textarea className="inp" value={eqForm.description} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{description:e.target.value});});}} placeholder="Serial number, condition, zones, notes..." rows={3} style={{fontSize:13,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+</div>
+</div>
+
+{/* PHOTO UPLOAD — large mobile-friendly button */}
+<div style={{marginBottom:14}}>
+<input ref={eqFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={uploadEqPhoto}/>
+<button onClick={function(){eqFileRef.current.click();}} disabled={eqUploading} style={{width:"100%",padding:"14px",background:"var(--surface)",border:"2px dashed var(--border)",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",color:"var(--text)",opacity:eqUploading?.5:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+{eqUploading ? "⏳ Uploading..." : "📸 Take Photo or Upload"}
+</button>
 {eqPhotos.length > 0 && (
-<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
 {eqPhotos.map(function(url,i){return(
-<div key={i} style={{position:"relative",width:60,height:60,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)"}}>
+<div key={i} style={{position:"relative",width:72,height:72,borderRadius:10,overflow:"hidden",border:"2px solid var(--border)"}}>
 <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-<button onClick={function(){removeEqPhoto(i);}} style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.7)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+<button onClick={function(){removeEqPhoto(i);}} style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,.75)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
 </div>
 );})}
+<div style={{fontSize:10,color:"var(--muted)",alignSelf:"center"}}>{eqPhotos.length} photo{eqPhotos.length!==1?"s":""}</div>
 </div>
 )}
 </div>
 
-<div style={{display:"flex",gap:8}}>
-<button onClick={function(){saveEquipItem(sel);}} disabled={!eqForm.name.trim()} style={{background:"var(--orange)",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontSize:12,fontWeight:700,cursor:"pointer",opacity:eqForm.name.trim()?1:.5}}>
-{eqEditId ? "💾 Update" : "＋ Add to List"}
+{/* ACTION BUTTONS — full width for mobile */}
+<button onClick={function(){saveEquipItem(sel);}} disabled={!eqForm.name.trim()} style={{width:"100%",padding:"14px",background:"var(--orange)",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",opacity:eqForm.name.trim()?1:.4,marginBottom:8}}>
+{eqEditId ? "💾 Update Equipment" : "✓ Save to Checklist"}
 </button>
-{eqEditId && <button onClick={cancelEditEquip} style={{background:"var(--surface)",color:"var(--muted)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>}
+{eqEditId && <button onClick={cancelEditEquip} style={{width:"100%",padding:"12px",background:"var(--surface)",color:"var(--muted)",border:"1px solid var(--border)",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>}
+{!eqEditId && <button onClick={function(){setEqMode("checklist");setEqForm({name:"",category:"",description:"",location:"",brand:"",model:""});setEqPhotos([]);}} style={{width:"100%",padding:"12px",background:"transparent",color:"var(--muted)",border:"none",fontSize:12,cursor:"pointer"}}>← Back to Checklist</button>}
 </div>
-</div>
+)}
 
-{/* EQUIPMENT LIST */}
+{/* ── LIST MODE ── */}
+{eqMode==="list" && (
+<div>
 {getClientEquip(sel).length === 0 ? (
-<div style={{textAlign:"center",padding:"30px 0",color:"var(--muted)",fontSize:12}}>No equipment logged yet. Use the form above or tap a preset to get started.</div>
+<div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}>
+<div style={{fontSize:28,marginBottom:8}}>📋</div>
+<div style={{fontSize:13}}>No equipment logged yet.</div>
+<div style={{fontSize:11,marginTop:4,color:"var(--muted2)"}}>Switch to Checklist mode to start documenting.</div>
+</div>
 ) : (
 <div>
 {getClientEquip(sel).map(function(item, idx){
 var preset = EQ_PRESETS.find(function(p){return p.id===item.category;});
 var isExpanded = eqExpanded === item.id;
 return(
-<div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,marginBottom:8,overflow:"hidden"}}>
-<div onClick={function(){setEqExpanded(isExpanded?null:item.id);}} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}>
-<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0}}>{idx+1}</div>
+<div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12,marginBottom:8,overflow:"hidden"}}>
+<div onClick={function(){setEqExpanded(isExpanded?null:item.id);}} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer"}}>
+<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,flexShrink:0}}>{idx+1}</div>
 <div style={{flex:1,minWidth:0}}>
-<div style={{fontWeight:700,fontSize:13,color:"var(--text)"}}>{preset?preset.icon+" ":""}{item.name}</div>
-{item.location && <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>📍 {item.location}</div>}
+<div style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{preset?preset.icon+" ":""}{item.name}</div>
+{item.location && <div style={{fontSize:12,color:"var(--blue)",marginTop:2}}>📍 {item.location}</div>}
+{(item.brand||item.model) && <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{[item.brand,item.model].filter(Boolean).join(" · ")}</div>}
 </div>
-{item.photos && item.photos.length > 0 && <span style={{fontSize:10,color:"var(--muted)",flexShrink:0}}>📷 {item.photos.length}</span>}
-<span style={{fontSize:16,color:"var(--muted)",transform:isExpanded?"rotate(180deg)":"rotate(0)",transition:"transform .2s"}}>▾</span>
+{item.photos && item.photos.length > 0 && <span style={{fontSize:11,color:"var(--muted)",flexShrink:0,background:"var(--surface)",padding:"3px 8px",borderRadius:10}}>📷 {item.photos.length}</span>}
+<span style={{fontSize:18,color:"var(--muted)",transform:isExpanded?"rotate(180deg)":"rotate(0)",transition:"transform .2s",flexShrink:0}}>▾</span>
 </div>
 
 {isExpanded && (
-<div style={{padding:"0 14px 14px",borderTop:"1px solid var(--border)"}}>
-{item.description && <div style={{fontSize:12,color:"var(--muted)",marginTop:10,lineHeight:1.5}}>{item.description}</div>}
-{item.addedDate && <div style={{fontSize:10,color:"var(--muted2)",marginTop:6}}>Added: {item.addedDate}</div>}
+<div style={{padding:"0 16px 16px",borderTop:"1px solid var(--border)"}}>
+{item.description && <div style={{fontSize:13,color:"var(--muted)",marginTop:12,lineHeight:1.6}}>{item.description}</div>}
+{(item.brand||item.model) && <div style={{fontSize:11,color:"var(--muted2)",marginTop:6}}>🏷 {[item.brand,item.model].filter(Boolean).join(" — ")}</div>}
+{item.addedDate && <div style={{fontSize:10,color:"var(--muted2)",marginTop:4}}>Added: {item.addedDate}</div>}
 
 {item.photos && item.photos.length > 0 && (
 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
 {item.photos.map(function(url,pi){return(
-<div key={pi} style={{width:80,height:80,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer"}} onClick={function(e){e.stopPropagation();window.open(url,"_blank");}}>
+<div key={pi} style={{width:80,height:80,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer"}} onClick={function(e){e.stopPropagation();window.open(url,"_blank");}}>
 <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
 </div>
 );})}
 </div>
 )}
 
-<div style={{display:"flex",gap:8,marginTop:10}}>
-<button onClick={function(e){e.stopPropagation();startEditEquip(item);}} style={{background:"var(--surface)",color:"var(--blue)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>✏️ Edit</button>
-<button onClick={function(e){e.stopPropagation();if(confirm("Remove "+item.name+"?"))deleteEquipItem(sel,item.id);}} style={{background:"var(--surface)",color:"var(--red)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>🗑 Remove</button>
+<div style={{display:"flex",gap:8,marginTop:12}}>
+<button onClick={function(e){e.stopPropagation();startEditEquip(item);}} style={{flex:1,padding:"10px",background:"var(--surface)",color:"var(--blue)",border:"1px solid var(--border)",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>✏️ Edit</button>
+<button onClick={function(e){e.stopPropagation();if(confirm("Remove "+item.name+"?"))deleteEquipItem(sel,item.id);}} style={{flex:1,padding:"10px",background:"var(--surface)",color:"var(--red)",border:"1px solid var(--border)",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>🗑 Remove</button>
 </div>
 </div>
 )}
 </div>
 );})}
-<div style={{fontSize:10,color:"var(--muted2)",textAlign:"center",marginTop:8}}>{getClientEquip(sel).length} item{getClientEquip(sel).length!==1?"s":""} logged</div>
+<div style={{fontSize:10,color:"var(--muted2)",textAlign:"center",marginTop:8,padding:"8px 0"}}>{getClientEquip(sel).length} item{getClientEquip(sel).length!==1?"s":""} logged at this property</div>
 </div>
 )}
+</div>
+)}
+
 </div>
 )}
 `;
@@ -300,26 +402,21 @@ if (content.includes(jobTabMarker)) {
 // ════════════════════════════════════════════
 // PATCH 5: Add Equipment tab content in Job detail
 // ════════════════════════════════════════════
-// Find the timeline tab block end and inject after it
 const timelineMarker = '{jobTab==="timeline" && (';
-// If there's no explicit timeline marker (it might use a different pattern), try alternatives
 let jobEquipInsertIdx = -1;
 
 const timelineIdx = content.indexOf(timelineMarker);
 if (timelineIdx !== -1) {
   jobEquipInsertIdx = findConditionalBlockEnd(content, timelineMarker);
 } else {
-  // Fallback: look for the timeline block with function syntax
   const altMarker = 'jobTab==="timeline"';
   const altIdx = content.indexOf(altMarker);
   if (altIdx !== -1) {
     jobEquipInsertIdx = findConditionalBlockEnd(content, altMarker + ' && (');
     if (jobEquipInsertIdx === -1) {
-      // Try to find the closing of the detail-body div
-      const detailBodyMarker = '{/* BODY */}';
+      const detailBodyMarker = '{ /* BODY */}';
       const bodyIdx = content.indexOf(detailBodyMarker);
       if (bodyIdx !== -1) {
-        // Find the closing </div> of the detail-body
         const closingDiv = content.indexOf('</div>', content.lastIndexOf('}', content.indexOf('/* ===', bodyIdx + 500)));
         if (closingDiv !== -1) jobEquipInsertIdx = closingDiv;
       }
@@ -327,28 +424,25 @@ if (timelineIdx !== -1) {
   }
 }
 
-// If we still couldn't find the injection point for jobs, we'll inject before the closing of the detail-body div
-// by searching for a pattern that appears after all job tab contents
 if (jobEquipInsertIdx === -1) {
-  // Look for the end of the last job tab content before the jobs page closing
-  // Find the comment block that marks the end of job tabs
   const jobsEndComment = '/* ==========================================';
   const jobsPageStart = content.indexOf('function JobsPage(');
   if (jobsPageStart !== -1) {
     const nextSection = content.indexOf(jobsEndComment, jobsPageStart + 5000);
-    // Inject before the last few closing divs before the next section
     if (nextSection !== -1) {
-      // Go back to find the function's return closing
-      jobEquipInsertIdx = nextSection - 20; // approximate
+      jobEquipInsertIdx = nextSection - 20;
     }
   }
 }
 
 const jobEquipContent = `
 {jobTab==="equipment" && (
-<div style={{padding:16}}>
-<div style={{fontSize:18,fontWeight:800,color:"var(--text)",marginBottom:4}}>Equipment at Site</div>
-<div style={{fontSize:12,color:"var(--muted)",marginBottom:14}}>Equipment logged for this client. Add items from the Client profile Equipment tab.</div>
+<div style={{padding:16,maxWidth:540,margin:"0 auto"}}>
+<div style={{textAlign:"center",marginBottom:16}}>
+<div style={{fontSize:22,marginBottom:2}}>🔧</div>
+<div style={{fontSize:16,fontWeight:800,color:"var(--text)"}}>Equipment at Site</div>
+<div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>Equipment logged for this client. Manage from Client profile → Equipment tab.</div>
+</div>
 
 {(function(){
 var clientId = sel ? (typeof sel === "object" ? sel.clientId || sel.client : sel) : null;
@@ -358,7 +452,7 @@ try { var raw = JSON.parse(localStorage.getItem("sp_client_equipment_v1")||"{}")
 
 if (cEquip.length === 0) return (
 <div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}>
-<div style={{fontSize:28,marginBottom:8}}>🔧</div>
+<div style={{fontSize:28,marginBottom:8}}>📋</div>
 <div style={{fontSize:13}}>No equipment logged for this client yet.</div>
 <div style={{fontSize:11,marginTop:4}}>Go to the Client profile → Equipment tab to add items.</div>
 </div>
@@ -367,19 +461,20 @@ if (cEquip.length === 0) return (
 return (
 <div>
 {cEquip.map(function(item, idx){
-var preset = [{id:"controller",icon:"🎛"},{id:"backflow",icon:"🔄"},{id:"valve",icon:"🔧"},{id:"timer",icon:"⏱"},{id:"pump",icon:"⛽"},{id:"filter",icon:"🧹"},{id:"meter",icon:"📊"},{id:"sprinkler",icon:"💧"},{id:"drain",icon:"🕳"},{id:"pipe",icon:"🔩"},{id:"sensor",icon:"📡"},{id:"custom",icon:"✏️"}].find(function(p){return p.id===item.category;});
+var preset = [{id:"controller",icon:"🎛"},{id:"backflow",icon:"🔄"},{id:"valve",icon:"🔧"},{id:"rain_sensor",icon:"🌧"},{id:"timer",icon:"⏱"},{id:"pump",icon:"⛽"},{id:"filter",icon:"🧹"},{id:"meter",icon:"📊"},{id:"sprinkler",icon:"💧"},{id:"drain",icon:"🕳"},{id:"pipe",icon:"🔩"},{id:"sensor",icon:"📡"},{id:"custom",icon:"✏️"}].find(function(p){return p.id===item.category;});
 return(
-<div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:8}}>
-<div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0}}>{idx+1}</div>
+<div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12,padding:16,marginBottom:10}}>
+<div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,flexShrink:0}}>{idx+1}</div>
 <div style={{flex:1}}>
-<div style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{preset?preset.icon+" ":""}{item.name}</div>
-{item.location && <div style={{fontSize:11,color:"var(--blue)",marginTop:3}}>📍 {item.location}</div>}
+<div style={{fontWeight:700,fontSize:15,color:"var(--text)"}}>{preset?preset.icon+" ":""}{item.name}</div>
+{item.location && <div style={{fontSize:12,color:"var(--blue)",marginTop:3}}>📍 {item.location}</div>}
+{(item.brand||item.model) && <div style={{fontSize:12,color:"var(--muted)",marginTop:3}}>🏷 {[item.brand,item.model].filter(Boolean).join(" — ")}</div>}
 {item.description && <div style={{fontSize:12,color:"var(--muted)",marginTop:4,lineHeight:1.5}}>{item.description}</div>}
 {item.photos && item.photos.length > 0 && (
-<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
 {item.photos.map(function(url,pi){return(
-<div key={pi} style={{width:64,height:64,borderRadius:6,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer"}} onClick={function(){window.open(url,"_blank");}}>
+<div key={pi} style={{width:72,height:72,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer"}} onClick={function(){window.open(url,"_blank");}}>
 <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
 </div>
 );})}
@@ -390,7 +485,7 @@ return(
 </div>
 );
 })}
-<div style={{fontSize:10,color:"var(--muted2)",textAlign:"center",marginTop:8}}>{cEquip.length} item{cEquip.length!==1?"s":""} at this site</div>
+<div style={{fontSize:10,color:"var(--muted2)",textAlign:"center",marginTop:8,padding:"8px 0"}}>{cEquip.length} item{cEquip.length!==1?"s":""} at this site</div>
 </div>
 );
 })()}
