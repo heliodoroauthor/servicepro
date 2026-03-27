@@ -47,6 +47,7 @@ const mobileCss = `
   .split,.split-3-2{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important}
 
   .card{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;margin-left:0!important;margin-right:0!important;border-radius:10px!important}
+  .fin-ai .card{width:auto!important;max-width:none!important;margin-left:auto!important;margin-right:auto!important}
   .ch{padding:12px!important;font-size:14px!important}
   .cb{padding:12px!important}
 
@@ -133,9 +134,15 @@ const mobileCss = `
   .mli-name{font-size:14px!important}
   .mli-amt{font-size:14px!important}
 
-  div[style*="display: flex"][style*="gap"]{flex-wrap:wrap!important}
+  :not(.fin-ai)>div[style*="display: flex"][style*="gap"]{flex-wrap:wrap!important}
   div[style*="overflow-x: auto"]{-webkit-overflow-scrolling:touch!important}
   img,video,canvas,svg{max-width:100%!important;height:auto!important}
+
+  .fin-ai input,.fin-ai select,.fin-ai textarea{width:auto!important;max-width:none!important;min-height:auto!important;font-size:inherit!important;border-radius:inherit!important}
+  .fin-ai .inp{width:auto!important;min-height:auto!important;font-size:inherit!important}
+  .fin-ai .btn{min-height:auto!important;min-width:auto!important;font-size:inherit!important;padding:inherit!important;border-radius:inherit!important}
+  .fin-ai .btn-sm{min-height:auto!important;font-size:inherit!important;padding:inherit!important}
+  .fin-ai svg{max-width:none!important;height:auto!important}
 }
 
 @media(max-width:380px){
@@ -214,13 +221,44 @@ if (content.includes(JSX_MARKER_START)) {
   console.log('[add-mobile-responsive] Cleaned up previously injected CSS from JSX.');
 }
 
+// â STEP 3.5: Add unique class to Financial AI section wrapper â
+
+const finAiIdx = content.indexOf('Financial AI Engine');
+if (finAiIdx !== -1) {
+  // Search backwards from "Financial AI Engine" to find the nearest className="fade"
+  const searchBack = content.substring(Math.max(0, finAiIdx - 600), finAiIdx);
+  const fadeMatch = searchBack.lastIndexOf('className="fade"');
+  if (fadeMatch !== -1) {
+    const absPos = Math.max(0, finAiIdx - 600) + fadeMatch;
+    content = content.substring(0, absPos) + 'className="fade fin-ai"' + content.substring(absPos + 'className="fade"'.length);
+    console.log('[add-mobile-responsive] Added fin-ai class to Financial AI wrapper.');
+  } else {
+    console.log('[add-mobile-responsive] Could not find fade wrapper for Financial AI section.');
+  }
+} else {
+  console.log('[add-mobile-responsive] Financial AI Engine text not found in JSX.');
+}
+
 // â STEP 4: Patch inline styles that cause horizontal overflow â
 
 let patchCount = 0;
 
+// Find the Financial AI section boundaries to skip patching inside it
+const finAiStart = content.indexOf('className="fade fin-ai"');
+let finAiEnd = -1;
+if (finAiStart !== -1) {
+  // Find the matching closing tag by counting braces/depth - approximate with next className="fade"
+  const nextFade = content.indexOf('className="fade"', finAiStart + 30);
+  finAiEnd = nextFade !== -1 ? nextFade : content.length;
+}
+
 content = content.replace(
   /style=\{\{([^}]*display:\s*['"]flex['"][^}]*?)\}\}/g,
-  (match, inner) => {
+  (match, inner, offset) => {
+    // Skip if inside the Financial AI section
+    if (finAiStart !== -1 && offset > finAiStart && offset < finAiEnd) {
+      return match;
+    }
     if (inner.includes('gap') && !inner.includes('flexWrap')) {
       patchCount++;
       return match.replace('}}', ', flexWrap:"wrap"}}');
