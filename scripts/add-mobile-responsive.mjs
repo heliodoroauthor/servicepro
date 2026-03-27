@@ -1,79 +1,66 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ————————————————————————————————————————————————————————————
 // add-mobile-responsive.mjs
 // Comprehensive mobile-first responsive optimization
-// Injects CSS media queries + patches inline styles that cause
-// horizontal overflow on small screens (< 480px)
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// Injects CSS media queries into index.html + patches inline styles
+// in ServiceProApp.jsx that cause horizontal overflow on small screens
+// ————————————————————————————————————————————————————————————
 
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 const original = content;
 
-// Ã¢ÂÂÃ¢ÂÂ STEP 1: Inject mobile CSS into the <style> tag inside ServiceProApp.jsx Ã¢ÂÂÃ¢ÂÂ
-// NOTE: index.css is NOT imported by main.jsx Ã¢ÂÂ all CSS lives inside a <style> tag in the JSX
+// — STEP 1: Define mobile CSS —
 
 const mobileCss = `
-/* âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-   MOBILE-FIRST RESPONSIVE OVERHAUL
-   Targets: phones < 480px and tablets < 768px
-   âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
+/* MOBILE-FIRST RESPONSIVE OVERHAUL */
+/* Targets: phones < 480px and tablets < 768px */
 
-/* âââ GLOBAL MOBILE RESET (< 768px) âââ */
 @media(max-width:768px){
   html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important}
-  div,span,section,nav,main,article,aside,header,footer,form,input,select,textarea,button,table,th,td,tr,ul,ol,li,a,p,h1,h2,h3,h4,h5,h6,label,img{box-sizing:border-box!important}
+  *{box-sizing:border-box!important}
 
-  /* âââ CORE LAYOUT âââ */
   .app{flex-direction:column!important;width:100%!important;max-width:100vw!important;overflow-x:hidden!important}
 
-  /* Hide desktop sidebar + topbar */
   .sb{display:none!important}
   .topbar{display:none!important}
 
-  /* Show mobile topbar */
   .mobile-topbar{display:flex!important}
 
-  /* Show bottom navigation */
   .bottom-nav{display:flex!important;position:fixed!important;bottom:0!important;left:0!important;right:0!important;z-index:9999!important;background:#1a1a2e!important;border-top:1px solid rgba(255,255,255,.1)!important;padding:4px 0 env(safe-area-inset-bottom,4px)!important}
   .bn-item{flex:1!important;display:flex!important;flex-direction:column!important;align-items:center!important;padding:6px 2px!important;font-size:10px!important;min-height:44px!important;justify-content:center!important}
   .bn-item-icon{font-size:20px!important}
 
-  /* Fix main content area */
   .main{margin-left:0!important;width:100%!important;max-width:100vw!important;min-width:0!important;flex:1!important;padding-bottom:72px!important;overflow-x:hidden!important}
   .page{padding:10px!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow-x:hidden!important}
 
-  /* Drawer overlay for hamburger menu */
   .drawer-overlay.open{display:block!important}
   .drawer.open{display:flex!important;position:fixed!important;top:0!important;left:0!important;bottom:0!important;z-index:10000!important;width:280px!important;max-width:80vw!important}
 
-  /* âââ DASHBOARD / HOME âââ */
   .stats{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:8px!important;width:100%!important}
   .stat,.sv{flex:1 1 45%!important;min-width:0!important;padding:10px!important;font-size:13px!important}
   .sl,.ss{width:100%!important;min-width:0!important}
+
   .card .g2,.card .g3,.g2,.g3{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;width:100%!important}
+
   .split,.split-3-2{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important}
 
-  /* âââ CARDS & CONTAINERS âââ */
   .card{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;margin-left:0!important;margin-right:0!important;border-radius:10px!important}
   .ch{padding:12px!important;font-size:14px!important}
   .cb{padding:12px!important}
 
-  /* âââ MODALS âââ */
   .modal{width:95vw!important;max-width:95vw!important;max-height:90vh!important;margin:2.5vh auto!important;overflow-y:auto!important;border-radius:12px!important}
   .mh{padding:14px!important;font-size:16px!important}
   .mb2{padding:12px!important}
   .mf{padding:12px!important;flex-wrap:wrap!important;gap:8px!important}
   .mt2{padding:12px!important}
 
-  /* âââ INPUTS & FORMS âââ */
   input,select,textarea{width:100%!important;max-width:100%!important;min-height:44px!important;font-size:16px!important;box-sizing:border-box!important;border-radius:8px!important}
   .inp{width:100%!important;min-height:44px!important;font-size:16px!important}
   .fg{width:100%!important;margin-bottom:10px!important}
   .search-bar{width:100%!important;max-width:100%!important;box-sizing:border-box!important}
 
-  /* âââ BUTTONS âââ */
   .btn{min-height:44px!important;min-width:44px!important;font-size:14px!important;padding:10px 16px!important;border-radius:8px!important}
   .btn-sm{min-height:38px!important;font-size:13px!important;padding:8px 12px!important}
   .btn-lg{min-height:50px!important;font-size:16px!important;padding:12px 20px!important;width:100%!important}
@@ -83,7 +70,6 @@ const mobileCss = `
   .wf-actions{flex-wrap:wrap!important;gap:6px!important}
   .fab{position:fixed!important;bottom:80px!important;right:16px!important;z-index:9998!important;min-width:48px!important;min-height:48px!important;border-radius:50%!important}
 
-  /* âââ TABS âââ */
   .tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:4px!important;width:100%!important;-webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;padding-bottom:4px!important}
   .tabs::-webkit-scrollbar{display:none!important}
   .tab{flex:0 0 auto!important;min-width:0!important;font-size:12px!important;padding:8px 12px!important;white-space:nowrap!important;border-radius:20px!important}
@@ -99,18 +85,15 @@ const mobileCss = `
   .prop-detail-tabs::-webkit-scrollbar{display:none!important}
   .pdt-btn{font-size:12px!important;padding:8px 10px!important;white-space:nowrap!important}
 
-  /* âââ JOBS SECTION âââ */
   .job-card{width:100%!important;box-sizing:border-box!important}
   .job-map{height:150px!important;border-radius:8px!important}
   .job-map-addr{font-size:12px!important}
 
-  /* âââ SCHEDULE / CALENDAR âââ */
   .sched-header{flex-wrap:wrap!important;gap:8px!important}
   .cal-grid{font-size:10px!important;gap:1px!important;width:100%!important;table-layout:fixed!important}
   .cal-day{min-height:36px!important;padding:2px!important;font-size:9px!important;overflow:hidden!important}
   .cal-dot{width:6px!important;height:6px!important}
 
-  /* âââ CLIENTS SECTION âââ */
   .split-client{display:flex!important;flex-direction:column!important;gap:0!important;width:100%!important}
   .split-client>div:first-child{width:100%!important;max-height:35vh!important;overflow-y:auto!important;border-right:none!important;border-bottom:1px solid rgba(255,255,255,.1)!important}
   .split-client>div:last-child{width:100%!important;flex:1!important}
@@ -122,41 +105,34 @@ const mobileCss = `
   .info-row{flex-direction:column!important;gap:2px!important;padding:8px 0!important}
   .info-val{font-size:14px!important;word-break:break-word!important}
 
-  /* âââ EQUIPMENT âââ */
   .property-grid,.robot-grid,.robot-detail-grid{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important}
   .telemetry-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;width:100%!important}
 
-  /* âââ TABLES âââ */
   table{display:block!important;overflow-x:auto!important;max-width:100%!important;font-size:12px!important;-webkit-overflow-scrolling:touch!important}
   .stock-table{overflow-x:auto!important;max-width:100%!important;-webkit-overflow-scrolling:touch!important}
   th,td{padding:6px 8px!important;font-size:12px!important;white-space:nowrap!important}
 
-  /* âââ DETAIL SCREENS âââ */
   .detail-screen{width:100%!important;max-width:100%!important;min-width:0!important}
   .detail-topbar{flex-wrap:wrap!important;gap:8px!important;padding:10px!important}
   .detail-title{font-size:16px!important}
   .detail-body{padding:10px!important}
   .action-row{display:flex!important;flex-wrap:wrap!important;gap:6px!important;width:100%!important}
 
-  /* âââ CRM BOARD âââ */
   .crm-board{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important}
   .crm-col{width:100%!important;min-width:0!important;max-width:100%!important}
 
-  /* âââ PAYMENTS âââ */
   .pay-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;width:100%!important}
   .pay-opt{padding:12px!important;min-height:60px!important}
   .pay-icon{font-size:24px!important}
   .pay-label{font-size:12px!important}
   .send-inv-field{width:100%!important}
 
-  /* âââ MEDIA / PHOTOS âââ */
   .media-grid{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:6px!important;width:100%!important}
   .photo-thumb{width:100%!important;height:auto!important;aspect-ratio:1!important;object-fit:cover!important;border-radius:6px!important}
   .photo-add{width:100%!important;min-height:80px!important}
   .upload-zone{width:100%!important;padding:20px!important}
   .upload-zone-label{font-size:13px!important}
 
-  /* âââ MISC âââ */
   .expand-header{flex-wrap:wrap!important;gap:8px!important}
   .expand-header-left{min-width:0!important;flex:1!important}
   .badge{font-size:10px!important;padding:2px 6px!important}
@@ -164,13 +140,11 @@ const mobileCss = `
   .mli-name{font-size:14px!important}
   .mli-amt{font-size:14px!important}
 
-  /* âââ GENERIC OVERFLOW FIXES âââ */
   div[style*="display: flex"][style*="gap"]{flex-wrap:wrap!important}
   div[style*="overflow-x: auto"]{-webkit-overflow-scrolling:touch!important}
   img,video,canvas,svg{max-width:100%!important;height:auto!important}
 }
 
-/* âââ EXTRA-SMALL PHONES (< 380px) âââ */
 @media(max-width:380px){
   .page{padding:6px!important}
   .card{border-radius:8px!important}
@@ -185,229 +159,91 @@ const mobileCss = `
 }
 `;
 
-// Inject mobile CSS into the <style> tag in ServiceProApp.jsx
-const styleIdx = content.indexOf('<style>');
-if (styleIdx !== -1) {
-  const afterStyleTag = styleIdx + '<style>'.length;
-  // Minify the mobile CSS: strip comments, collapse whitespace
-  const minified = mobileCss
-    .replace(/\/\*[\s\S]*?\*\//g, '')  // strip comments
-    .replace(/\n\s*/g, '\n')           // collapse leading whitespace
-    .replace(/\n+/g, '\n')             // collapse blank lines
-    .replace(/\s*\{\s*/g, '{')         // collapse around {
-    .replace(/\s*\}\s*/g, '}')         // collapse around }
-    .replace(/\s*;\s*/g, ';')          // collapse around ;
-    .replace(/\s*:\s*/g, ':')          // collapse around :
-    .replace(/\s*,\s*/g, ',')          // collapse around ,
-    .trim();
-  content = content.slice(0, afterStyleTag) + '\n' + minified + '\n' + content.slice(afterStyleTag);
-  console.log('[add-mobile-responsive] Injected mobile CSS into <style> tag (' + minified.length + ' chars)');
-} else {
-  console.error('[add-mobile-responsive] ERROR: Could not find <style> tag in JSX!');
+// — STEP 2: Inject mobile CSS into index.html (NOT into JSX to avoid esbuild parse errors) —
+
+const MARKER_START = '<!-- ==MOBILE-RESPONSIVE-START== -->';
+const MARKER_END = '<!-- ==MOBILE-RESPONSIVE-END== -->';
+
+try {
+  let indexHtml = readFileSync('index.html', 'utf8');
+
+  const styleBlock = `${MARKER_START}\n<style>\n${mobileCss}\n</style>\n${MARKER_END}`;
+
+  if (indexHtml.includes(MARKER_START)) {
+    // Replace existing mobile CSS block
+    const startIdx = indexHtml.indexOf(MARKER_START);
+    const endIdx = indexHtml.indexOf(MARKER_END) + MARKER_END.length;
+    indexHtml = indexHtml.substring(0, startIdx) + styleBlock + indexHtml.substring(endIdx);
+    console.log('[add-mobile-responsive] Replaced existing mobile CSS block in index.html.');
+  } else {
+    // Inject before </head>
+    const headCloseIdx = indexHtml.indexOf('</head>');
+    if (headCloseIdx !== -1) {
+      indexHtml = indexHtml.substring(0, headCloseIdx) + '\n' + styleBlock + '\n' + indexHtml.substring(headCloseIdx);
+      console.log('[add-mobile-responsive] Injected mobile CSS into index.html <head>.');
+    } else {
+      console.error('[add-mobile-responsive] Could not find </head> in index.html.');
+      process.exit(1);
+    }
+  }
+
+  // Also ensure viewport meta tag
+  if (!indexHtml.includes('viewport')) {
+    indexHtml = indexHtml.replace(
+      '<head>',
+      '<head>\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">'
+    );
+    console.log('[add-mobile-responsive] Added viewport meta tag.');
+  } else {
+    indexHtml = indexHtml.replace(
+      /(<meta[^>]*name=["']viewport["'][^>]*content=["'])[^"']*(["'][^>]*>)/,
+      '$1width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no$2'
+    );
+    console.log('[add-mobile-responsive] Updated viewport meta tag.');
+  }
+
+  writeFileSync('index.html', indexHtml);
+  console.log(`[add-mobile-responsive] CSS block: ${mobileCss.length} characters written to index.html`);
+} catch (e) {
+  console.error('[add-mobile-responsive] Failed to update index.html:', e.message);
   process.exit(1);
 }
 
-// Ã¢ÂÂÃ¢ÂÂ STEP 2: Patch inline styles in ServiceProApp.jsx that cause overflow Ã¢ÂÂÃ¢ÂÂ
+// — STEP 3: Remove any previously injected mobile CSS from JSX (cleanup) —
+
+const JSX_MARKER_START = '/* ==MOBILE-RESPONSIVE-START== */';
+const JSX_MARKER_END = '/* ==MOBILE-RESPONSIVE-END== */';
+
+if (content.includes(JSX_MARKER_START)) {
+  const startIdx = content.indexOf(JSX_MARKER_START);
+  const endIdx = content.indexOf(JSX_MARKER_END) + JSX_MARKER_END.length;
+  content = content.substring(0, startIdx) + content.substring(endIdx);
+  console.log('[add-mobile-responsive] Cleaned up previously injected CSS from JSX.');
+}
+
+// — STEP 4: Patch inline styles that cause horizontal overflow —
 
 let patchCount = 0;
 
-// PATCH A: Dashboard hero badges row Ã¢ÂÂ ensure wrapping on mobile
-// The row has minWidth:76 buttons that overflow on small screens
-const heroRowMarker = 'style={{display:"flex",gap:10,alignItems:"center"}}>';
-const heroRow2 = content.indexOf('"val":todayCount');
-// Instead, let's fix the stats grid that uses repeat(auto-fill,minmax(140px,1fr))
-// The KPI strip Ã¢ÂÂ make it responsive
 content = content.replace(
-  'gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",marginBottom:16',
-  'gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",marginBottom:16'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH A: KPI strip grid minmax reduced');
-
-// PATCH B: Quick Actions strip Ã¢ÂÂ make buttons wrap instead of scroll
-content = content.replace(
-  'style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",paddingBottom:2}}',
-  'style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",paddingBottom:2,flexWrap:"wrap",WebkitOverflowScrolling:"touch"}}'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH B: Quick actions flex-wrap');
-
-// PATCH C: Dashboard split Ã¢ÂÂ uses className="split" which is already handled by CSS
-// No inline patch needed.
-
-// PATCH D: Job detail tabs Ã¢ÂÂ make scrollable and smaller on mobile
-// The tabs already have overflowX:"auto" but let's add -webkit-overflow-scrolling
-content = content.replace(
-  'style={{overflowX:"auto",scrollbarWidth:"none",background:"var(--surface)",borderBottom:"2px solid var(--border)",flexShrink:0}}',
-  'style={{overflowX:"auto",scrollbarWidth:"none",WebkitOverflowScrolling:"touch",background:"var(--surface)",borderBottom:"2px solid var(--border)",flexShrink:0}}'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH D: Job tabs smooth scroll');
-
-// PATCH E: Inline grids with large minmax values Ã¢ÂÂ reduce for mobile
-// Fix gridTemplateColumns with minmax(340px,...) Ã¢ÂÂ way too wide for mobile
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(340px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(340px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(300px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(300px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(280px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(260px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(260px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(200px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(200px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(190px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(190px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(180px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(180px,100%),1fr))"'
-);
-patchCount++;
-
-content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(160px,1fr\)\)"/g,
-  'gridTemplateColumns:"repeat(auto-fill,minmax(min(160px,100%),1fr))"'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH E: Fixed all grid minmax for mobile');
-
-// PATCH F: Tables Ã¢ÂÂ wrap in scrollable container for mobile
-// Most tables already have tbl-wrap or overflowX:auto parents
-// But some raw <table> in the code don't. Let's add overflow to key table wrappers.
-// The invoice items table in job detail
-content = content.replace(
-  /style:\{overflowX:"auto"\}/g,
-  'style:{overflowX:"auto",WebkitOverflowScrolling:"touch"}'
-);
-// Also for style={{overflowX:"auto"}}
-content = content.replace(
-  /style=\{\{overflowX:"auto"\}\}/g,
-  'style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH F: Added touch scrolling to table wrappers');
-
-// PATCH G: Fixed-width elements that cause overflow
-// width:560px in camera estimate / invoice fullscreen Ã¢ÂÂ use max-width instead
-// There are divs with width:"min(560px,90vw)" Ã¢ÂÂ already good
-// Fix any width:480 or similar fixed widths
-content = content.replace(
-  /maxWidth:480,/g,
-  'maxWidth:"min(480px,100%)",'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH G: Fixed maxWidth:480 overflow');
-
-// PATCH H: Command palette width Ã¢ÂÂ already uses min(560px,90vw) Ã¢ÂÂ good
-
-// PATCH I: Dashboard hero action badges Ã¢ÂÂ the top right badges row
-// These use minWidth:76 which is fine but the parent flex needs wrapping
-// Let's find the badge container in the dashboard hero
-const heroBadgeRow = 'style={{display:"flex",gap:10,alignItems:"center"}}>';
-if (content.includes(heroBadgeRow)) {
-  // Already wraps fine due to flex behavior
-}
-
-// PATCH J: Viewport meta Ã¢ÂÂ make sure we prevent zoom on inputs (already has width=device-width)
-// Add maximum-scale and user-scalable meta to index.html if present
-try {
-  const indexHtml = 'index.html';
-  let html = readFileSync(indexHtml, 'utf8');
-  if (html.includes('width=device-width') && !html.includes('maximum-scale')) {
-    html = html.replace(
-      'width=device-width, initial-scale=1.0',
-      'width=device-width, initial-scale=1.0, viewport-fit=cover'
-    );
-    writeFileSync(indexHtml, html);
-    console.log('[add-mobile-responsive] PATCH J: Updated viewport meta in index.html');
+  /style=\{\{([^}]*display:\s*['"]flex['"][^}]*?)\}\}/g,
+  (match, inner) => {
+    if (inner.includes('gap') && !inner.includes('flexWrap')) {
+      patchCount++;
+      return match.replace('}}', ', flexWrap:"wrap"}}');
+    }
+    return match;
   }
-} catch (e) {
-  console.log('[add-mobile-responsive] PATCH J: index.html not found at root, skipping');
+);
+
+console.log(`[add-mobile-responsive] Patched ${patchCount} inline styles.`);
+
+// — STEP 5: Write the patched JSX —
+if (content !== original) {
+  writeFileSync(file, content);
+  console.log(`[add-mobile-responsive] Inline patches written to ${file}`);
+} else {
+  console.log('[add-mobile-responsive] No JSX changes needed.');
 }
 
-// PATCH K: Ensure all overflowX: "auto" containers have smooth scrolling
-// Already handled in CSS
-
-// PATCH L: Fix the CRM board on mobile Ã¢ÂÂ inline style override
-content = content.replace(
-  /className="crm-board"/g,
-  'className="crm-board" '
-);
-
-// PATCH M: Grid template fixed columns that break on mobile
-// "gridTemplateColumns: "1fr 1fr"" Ã¢ÂÂ these are fine since CSS handles .g2
-// But specific inline ones like: gridTemplateColumns:"3fr 2fr"
-content = content.replace(
-  /gridTemplateColumns:"3fr 2fr"/g,
-  'gridTemplateColumns:"minmax(0,3fr) minmax(0,2fr)"'
-);
-patchCount++;
-
-// PATCH N: Fix inline max-heights that are too tall for mobile
-// "maxHeight: 380" etc Ã¢ÂÂ change to use min() with vh
-content = content.replace(
-  /maxHeight:380,/g,
-  'maxHeight:"min(380px,60vh)",'
-);
-content = content.replace(
-  /maxHeight:"70vh"/g,
-  'maxHeight:"80vh"'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH N: Responsive max-heights');
-
-// PATCH O: Width:200 dropdown that may overflow
-content = content.replace(
-  'width:200,zIndex:200,maxHeight:280',
-  'width:"min(200px,80vw)",zIndex:200,maxHeight:280'
-);
-patchCount++;
-console.log('[add-mobile-responsive] PATCH O: Dropdown width responsive');
-
-// PATCH P: Calendar grid needs special mobile handling Ã¢ÂÂ already in CSS
-
-// PATCH Q: Ensure equipment checklist is mobile-friendly
-// The equipment module already uses maxWidth:540 which is fine with margin:"0 auto"
-// Category tags use flexWrap which handles mobile
-
-// PATCH R: Fix overflowX on detail-body
-content = content.replace(
-  'className="detail-body">',
-  'className="detail-body" style={{overflowX:"hidden"}}>'
-);
-// Be more careful Ã¢ÂÂ there might be detail-body with existing styles
-// Actually that would break ones that already have style. Let me be more targeted.
-// Revert the above and instead handle via CSS which we already did.
-content = content.replace(
-  'className="detail-body" style={{overflowX:"hidden"}}>',
-  'className="detail-body">'
-);
-
-// Write the patched JSX
-writeFileSync(file, content);
-console.log('[add-mobile-responsive] Ã¢ÂÂ All patches applied (' + patchCount + ' patches to JSX, mobile CSS injected)');
-console.log('[add-mobile-responsive] Original JSX: ' + original.length + ' chars Ã¢ÂÂ Patched: ' + content.length + ' chars');
+console.log('[add-mobile-responsive] Done.');
