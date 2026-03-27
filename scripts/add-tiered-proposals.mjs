@@ -1,250 +1,5 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// add-tiered-proposals.mjs
-// Adds optional tiered proposal system (Good/Better/Best)
-// to the Finance tab's estimate section.
-// Core estimating is untouched â tiers are a separate flow.
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-
-const file = 'src/ServiceProApp.jsx';
-let content = readFileSync(file, 'utf8');
-const original = content;
-
-// Guard: skip if already injected
-if (content.includes('showTierModal')) {
-  console.log('[add-tiered-proposals] Already injected, skipping.');
-  process.exit(0);
-}
-
-// â STEP 1: Add state variables after estItems state â
-
-const estItemsAnchor = '[estItems, setEstItems]';
-const estItemsIdx = content.indexOf(estItemsAnchor);
-if (estItemsIdx === -1) {
-  console.log('[add-tiered-proposals] Could not find estItems state. Skipping.');
-  process.exit(0);
-}
-
-// Find the end of the line containing estItems state
-const estItemsLineEnd = content.indexOf('\n', estItemsIdx);
-
-const tierStateCode = `
-const [showTierModal, setShowTierModal] = React.useState(false);
-const [tierProposals, setTierProposals] = React.useState([]);
-const [activeTierProposal, setActiveTierProposal] = React.useState(null);
-const [tierEditData, setTierEditData] = React.useState(null);
-const [tierActivePicker, setTierActivePicker] = React.useState(null);
-const [tierPickerSearch, setTierPickerSearch] = React.useState('');
-const [tierCustomerView, setTierCustomerView] = React.useState(null);
-
-const defaultTierPresets = [
-{name:'Good', color:'#4ade80', icon:'\\u2714', items:[], description:'Essential service to resolve the issue.', warranty:'30-day workmanship warranty', notes:''},
-{name:'Better', color:'#f59e0b', icon:'\\u2B50', items:[], description:'Enhanced service with improved parts and extended coverage.', warranty:'90-day parts & labor warranty', notes:'', recommended:true},
-{name:'Best', color:'#a855f7', icon:'\\uD83D\\uDC8E', items:[], description:'Premium service with top-tier components and comprehensive coverage.', warranty:'1-year full warranty', notes:''}
-];
-
-const initTierEdit = (existingProposal) => {
-if (existingProposal) {
-setTierEditData(JSON.parse(JSON.stringify(existingProposal)));
-} else {
-setTierEditData({
-id: Date.now(),
-name: 'Tiered Proposal',
-created: new Date().toISOString().slice(0,10),
-status: 'draft',
-tiers: JSON.parse(JSON.stringify(defaultTierPresets)),
-activeTierIdx: 0
-});
-}
-setShowTierModal(true);
-};
-
-const addTierToProposal = () => {
-if (!tierEditData) return;
-const newTier = {name:'Tier '+(tierEditData.tiers.length+1), color:'#60a5fa', icon:'\\u2795', items:[], description:'', warranty:'', notes:''};
-setTierEditData({...tierEditData, tiers:[...tierEditData.tiers, newTier], activeTierIdx: tierEditData.tiers.length});
-};
-
-const removeTierFromProposal = (idx) => {
-if (!tierEditData || tierEditData.tiers.length <= 2) return;
-const newTiers = tierEditData.tiers.filter((_,i)=>i!==idx);
-const newIdx = Math.min(tierEditData.activeTierIdx, newTiers.length-1);
-setTierEditData({...tierEditData, tiers:newTiers, activeTierIdx:newIdx});
-};
-
-const updateTierField = (tierIdx, field, value) => {
-if (!tierEditData) return;
-const newTiers = [...tierEditData.tiers];
-newTiers[tierIdx] = {...newTiers[tierIdx], [field]:value};
-setTierEditData({...tierEditData, tiers:newTiers});
-};
-
-const addItemToTier = (tierIdx, item) => {
-if (!tierEditData) return;
-const newTiers = [...tierEditData.tiers];
-const existing = newTiers[tierIdx].items.find(x=>x.name===item.name);
-if (existing) {
-existing.qty = (existing.qty||1)+1;
-newTiers[tierIdx] = {...newTiers[tierIdx], items:[...newTiers[tierIdx].items]};
-} else {
-newTiers[tierIdx] = {...newTiers[tierIdx], items:[...newTiers[tierIdx].items, {...item, qty:item.qty||1}]};
-}
-setTierEditData({...tierEditData, tiers:newTiers});
-};
-
-const removeItemFromTier = (tierIdx, itemIdx) => {
-if (!tierEditData) return;
-const newTiers = [...tierEditData.tiers];
-newTiers[tierIdx] = {...newTiers[tierIdx], items: newTiers[tierIdx].items.filter((_,i)=>i!==itemIdx)};
-setTierEditData({...tierEditData, tiers:newTiers});
-};
-
-const updateTierItemQty = (tierIdx, itemIdx, qty) => {
-if (!tierEditData) return;
-const newTiers = [...tierEditData.tiers];
-const newItems = [...newTiers[tierIdx].items];
-newItems[itemIdx] = {...newItems[itemIdx], qty: Math.max(1, qty)};
-newTiers[tierIdx] = {...newTiers[tierIdx], items: newItems};
-setTierEditData({...tierEditData, tiers:newTiers});
-};
-
-const saveTierProposal = () => {
-if (!tierEditData) return;
-setTierProposals(prev => {
-const exists = prev.find(p => p.id === tierEditData.id);
-if (exists) return prev.map(p => p.id === tierEditData.id ? tierEditData : p);
-return [...prev, tierEditData];
-});
-setShowTierModal(false);
-setTierEditData(null);
-};
-
-const deleteTierProposal = (id) => {
-setTierProposals(prev => prev.filter(p => p.id !== id));
-};
-
-const tierTotal = (tier) => tier.items.reduce((sum, it) => sum + (it.price||0)*(it.qty||1), 0);
-
-	Ë^[YÛØÙ[\ËÝ\ÛÜÜÚ[\ËÜ\Ì\\ÚYØN
-MYÉËÜ\Y]\ÎLÛÛÜÈØN
-MYÉËÛÙZYÚÛÚ^NMX\Ú[ÜXÚÙÜÝ[Ý[Ü\[	ß_O^ÌQÐHÜX]HY\YÜÜØ[Ù]ÂÛÛ[HÛÛ[ÝXÝ[ÊÜX]Q\Ý[Q[
-H
-È	×È
-ÈY\ÛÙH
-ÈÛÛ[ÝXÝ[ÊÜX]Q\Ý[Q[
-NÂÛÛÛÛKÙÊ	ÖØY]Y\Y\ÜÜØ[×HÕTYYÜX]HY\YÜÜØ[]ÛÊNÂBËÈ8 %ÕTÎYØ]YY\ÜÜØ[È\Ü^H
-ÈÝ\ÝÛY\Ø\Y]È8 %ËÈ[Ù\Y\H\]Y\ÝÚYÛ]\H]Û\XKYÜH[[ÜKÔXÙHÛÚÈ]ÛÂÛÛÝ\TÚYÐ[ÚÜH	Ô\]Y\ÝÚYÛ]\IÎÂËÈ[HÙXÛÛØØÝ\[ÙH
-\Ý\È[]ÙXÛÛ\È[[[ÙHXB]\TÚYÒYHÛÛ[[^Ù\TÚYÐ[ÚÜNÂY
-\TÚYÒYOOHLJHÂËÈ[HØØÝ\[ÙH]	ÜÈX\HÜX]H\Ý[X]H]Û\XBÛÛÝÜX]Q\ÝÜÈHÛÛ[[^Ù	ÐÜX]HY\YÜÜØ[	ÊNÂY
-ÜX]Q\ÝÜÈOOHLJHÂ\TÚYÒYHÛÛ[[^Ù\TÚYÐ[ÚÜÜX]Q\ÝÜÊNÂBBY
-\TÚYÒYOOHLJHÂÛÛÝ\TÚYÓ[Q[HÛÛ[[^Ù	×Ë\TÚYÒY
-NÂÛÛÝY\\Ü^PÛÙHHÝY\ÜÜØ[Ë[Ý	]Ý[O^ÞÛX\Ú[ÜM_O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÎMLØ	ËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_OY\YÜÜØ[ÏÙ]ÝY\ÜÜØ[ËX\
-O]Ù^O^ÝYHÛ\ÜÓ[YOHØ\Ý[O^ÞÜY[ÎMX\Ú[ÝÛNÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎL_O]Ý[O^ÞÙ\Ü^NÙ^	Ë\ÝYPÛÛ[ÜÜXÙKX]ÙY[Ë[YÛ][\ÎØÙ[\ËX\Ú[ÝÛN_O]Ý[O^ÞÙÛÙZYÚÌÛÚ^NM__OÝ[Y_OÙ]]Ý[O^ÞÙ\Ü^NÙ^	ËØ\[YÛ][\ÎØÙ[\ß_OÜ[Û\ÜÓ[YOHYÙHÝ[O^ÞØXÚÙÜÝ[Ý]\ÏOOIÜÙ[	ÏÉÈÌMÙXÎÝ]\ÏOOIØ\ÝY	ÏÉÈÌMLÍIÎÈÍ
-ÍMMIËÛÛÜÈÙËY[ÎÌ	ËÜ\Y]\ÎÛÚ^NLK^[ÙÜNÝ\\Ø\ÙIß_OÝÝ]\ßOÜÜ[Ü[Ý[O^ÞÙÛÚ^NLKÛÛÜÈÍ
-Íß_OÝÜX]YOÜÜ[Ù]Ù]]Ý[O^ÞÙ\Ü^NÙ^	ËØ\^Ü\ÝÜ\	ËX\Ú[ÝÛNL_OÝY\ËX\
-
-JOO]Ù^O^Ú_HÝ[O^ÞØXÚÙÜÝ[ÛÛÜÉÌN	ËÜ\Ì\ÛÛY	ÊÝÛÛÜÉÍ
-	ËÜ\Y]\ÎY[ÎÍL	ËÛÚ^NL_OÜ[Ý[O^ÞØÛÛÜÛÛÜÛÙZYÚ_OÝXÛÛHÝ[Y_OÜÜ[Ü[Ý[O^ÞØÛÛÜÈÎMLØ	ËX\Ú[Y_OÝÚ[ÝËÕTSÖ_	É	ß^ÝY\Ý[
-
-KÑ^Y
-_OÜÜ[Ù]_BÙ]]Ý[O^ÞÙ\Ü^NÙ^	ËØ\_O]ÛÛXÚÏ^Ê
-OO[]Y\Y]
-
-_HÛ\ÜÓ[YOH\ÛHÝ[O^ÞÙ^K^[YÛØÙ[\ËY[ÎÎ	ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÝ\ÛÜÜÚ[\ËÛÚ^NLÛÛÜÈÙLN	ß_OY]Ù]]ÛÛXÚÏ^Ê
-OOÙ]Y\Ý\ÝÛY\Y]Ê
-_HÛ\ÜÓ[YOH\ÛHÝ[O^ÞÙ^K^[YÛØÙ[\ËY[ÎÎ	ËXÚÙÜÝ[ÈÍØÌØYY	ËÜ\Y]\ÎÝ\ÛÜÜÚ[\ËÛÚ^NLÛÛÜÈÙß_OÝ\ÝÛY\]Y]ÏÙ]]ÛÛXÚÏ^Ê
-OOÚYÛÛ\J	Ñ[]H\ÈY\YÜÜØ[ÉÊJY[]UY\ÜÜØ[
-Y
-__HÛ\ÜÓ[YOH\ÛHÝ[O^ÞÝ^[YÛØÙ[\ËY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÝ\ÛÜÜÚ[\ËÛÚ^NLÛÛÜÈÙY
-
-
-	ß_OLÌMOÙ]Ù]Ù]_BÙ]BÝY\Ý\ÝÛY\Y]È	]Ý[O^ÞÜÜÚ][ÛÙ^Y	ËÜYYÚÝÛNXÚÙÜÝ[ÜØJÊIË[^NNNK\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\Ë\ÝYPÛÛ[ØÙ[\ËY[Î_HÛÛXÚÏ^ÙOOÚYK\Ù]OOYKÝ\[\Ù]
-\Ù]Y\Ý\ÝÛY\Y]Ê[
-__O]Ý[O^ÞØXÚÙÜÝ[ÈÌMÌIËÜ\Y]\ÎMY[ÎX^ÚYLÚYÌL	IËX^ZYÚÎL	ËÝ\ÝÎØ]]ÉËÜ\Ì\ÛÛYÌÌÍMMIß_O]Ý[O^ÞÙ\Ü^NÙ^	Ë\ÝYPÛÛ[ÜÜXÙKX]ÙY[Ë[YÛ][\ÎØÙ[\ËX\Ú[ÝÛNM_O]Ý[O^ÞÙÛÚ^NNÛÙZYÚÌÛÛÜÈÙYYIß_OÚÛÜÙH[Ý\Ù\XÙHXÚØYÙOÙ]]ÛÛXÚÏ^Ê
-OOÙ]Y\Ý\ÝÛY\Y]Ê[
-_HÝ[O^ÞØÝ\ÛÜÜÚ[\ËÛÚ^NÛÛÜÈÎMLØ	ß_OLÌMOÙ]Ù]]Ý[O^ÞÙ\Ü^NÙ^	ËØ\X\Ú[ÝÛNMÜ\ÝÛNÌ\ÛÛYÌYLLØËY[ÐÝÛN_OÝY\Ý\ÝÛY\Y]ËY\ËX\
-
-JOO]Ù^O^Ú_HÛÛXÚÏ^Ê
-OOÙ]XÝ]UY\ÜÜØ[
-J_HÝ[O^ÞÙ^K^[YÛØÙ[\ËY[ÎÌL	ËÜ\Y]\ÎLÝ\ÛÜÜÚ[\ËXÚÙÜÝ[XÝ]UY\ÜÜØ[OOZOÝÛÛÜÉÌÎÝ[Ü\[	ËÜ\XÝ]UY\ÜÜØ[OOZOÉÌÛÛY	ÊÝÛÛÜÌÛÛY[Ü\[	ËÜÚ][ÛÜ[]]IË[Ú][ÛØ[Éß_O]Ý[O^ÞÙÛÚ^NMX\Ú[ÝÛN_OÝXÛÛOÙ]]Ý[O^ÞÙÛÙZYÚÌÛÚ^NLËÛÛÜÛÛÜ_OÝ[Y_OÙ]ÝXÛÛ[Y[Y	]Ý[O^ÞÜÜÚ][ÛØXÛÛ]IËÜNYÚMXÚÙÜÝ[ÈÙNYLËÛÛÜÈÌ	ËÛÚ^NKÛÙZYÚY[ÎÌ\
-	ËÜ\Y]\Î^[ÙÜNÝ\\Ø\ÙIß_O\Ý[YOÙ]BÙ]_BÙ]ÝY\Ý\ÝÛY\Y]ËY\ÖØXÝ]UY\ÜÜØ[H	
-
-
-HOÂÛÛÝHY\Ý\ÝÛY\Y]ËY\ÖØXÝ]UY\ÜÜØ[NÂ]\]]Ý[O^ÞØÛÛÜÈÎMLØ	ËÛÚ^NLËX\Ú[ÝÛNL[RZYÚK__OÝ\ØÜ\[ÛOÙ]Ý][\Ë[Ý	]Ý[O^ÞÛX\Ú[ÝÛNL_OÝ][\ËX\
-
-]OO]Ù^O^ÚHÝ[O^ÞÙ\Ü^NÙ^	Ë\ÝYPÛÛ[ÜÜXÙKX]ÙY[ËY[ÎÎ	ËÜ\ÝÛNÌ\ÛÛYÌYLLØËÛÚ^NLß_OÜ[Ý[O^ÞØÛÛÜÈÙLN	ß_OÚ][Y_HÚ]]OOÉ×L
-ÉÊÚ]]NÉßOÜÜ[Ü[Ý[O^ÞØÛÛÜÈÎMLØ	ËÛÙZYÚ_OÝÚ[ÝËÕTSÖ_	É	ß^Ê
-]XÙ_
-J]]_JJKÑ^Y
-_OÜÜ[Ù]_BÙ]B]Ý[O^ÞÙ\Ü^NÙ^	Ë\ÝYPÛÛ[ÜÜXÙKX]ÙY[ËY[ÎÌL	ËÜ\ÜÌÛÛY	ÊÝÛÛÜX\Ú[Ü_OÜ[Ý[O^ÞÙÛÙZYÚÌÛÚ^NMKÛÛÜÈÙYYIß_OÝ[ÜÜ[Ü[Ý[O^ÞÙÛÙZYÚÌÛÚ^NMKÛÛÜÛÛÜ_OÝÚ[ÝËÕTSÖ_	É	ß^ÝY\Ý[
-
-KÑ^Y
-_OÜÜ[Ù]ÝØ\[H	]Ý[O^ÞÛX\Ú[ÜY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÛÚ^NLÛÛÜÈÎMLØ	ß_O^ÌQL_HÝØ\[_OÙ]BÝÝ\È	]Ý[O^ÞÛX\Ú[ÜY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÛÚ^NLÛÛÜÈÎMLØ	ß_O^ÌQHÝÝ\ßOÙ]B]ÛÛXÚÏ^Ê
-OOÜÙ]Y\ÜÜØ[Ê]O]X\
-OYOO]Y\Ý\ÝÛY\Y]ËYÞËÝ]\ÎØ\ÝY	ËÙ[XÝYY\XÝ]UY\ÜÜØ[N
-JNÜÙ]Y\Ý\ÝÛY\Y]Ê[
-__HÛ\ÜÓ[YOHÝ[O^ÞÝÚYÌL	IËX\Ú[ÜMY[ÎÌM	Ë^[YÛØÙ[\ËXÚÙÜÝ[ÛÛÜÛÛÜÛÛÜOOIÈÙNYLÏÉÈÌ	ÎÈÙËÛÙZYÚÌÛÚ^NMKÜ\Y]\ÎLÝ\ÛÜÜÚ[\ß_OÙ[XÝÝ[Y_HXÚØYÙOÙ]Ù]ÂJJ
-_BÙ]Ù]XÂÛÛ[HÛÛ[ÝXÝ[Ê\TÚYÓ[Q[
-H
-È	×È
-ÈY\\Ü^PÛÙH
-ÈÛÛ[ÝXÝ[Ê\TÚYÓ[Q[
-NÂÛÛÛÛKÙÊ	ÖØY]Y\Y\ÜÜØ[×HÕTÎYYY\ÜÜØ[È\Ü^H
-ÈÝ\ÝÛY\Y]ËÊNÂBËÈ8 %ÕT
-YHY\YÜÜØ[Y]Ü[Ù[8 %ËÈ[Ù\YÜHHÛÜÚ[ÈÙHÛÛ\Û[	ÜÈ]\
-[H[XXHÜÝ
-BËÈÙIÛ[Ù\]YÚYÜHH\ÝØØÝ\[ÙHÙH\Ý[X]H[Ù[\XBÛÛÝY\[Ù[ÛÙHHÜÚÝÕY\[Ù[	Y\Y]]H	]Ý[O^ÞÜÜÚ][ÛÙ^Y	ËÜYYÚÝÛNXÚÙÜÝ[ÜØJÊIË[^NNN\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\Ë\ÝYPÛÛ[ØÙ[\ËY[Î_HÛÛXÚÏ^ÙOOÚYK\Ù]OOYKÝ\[\Ù]
-^ÜÙ]ÚÝÕY\[Ù[
-[ÙJNÜÙ]Y\Y]]J[
-___O]Ý[O^ÞØXÚÙÜÝ[ÈÌMÌIËÜ\Y]\ÎMY[ÎX^ÚYÌÚYÌL	IËX^ZYÚÎL	ËÝ\ÝÎØ]]ÉËÜ\Ì\ÛÛYÌÌÍMMIß_O]Ý[O^ÞÜY[ÎÌ	ËÜ\ÝÛNÌ\ÛÛYÌYLLØË\Ü^NÙ^	Ë\ÝYPÛÛ[ÜÜXÙKX]ÙY[Ë[YÛ][\ÎØÙ[\ß_O]Ý[O^ÞÙÛÚ^NNÛÙZYÚÌÛÛÜÈÙYYIß_OÝY\Y]]KY	Y\ÜÜØ[Ë[
-OYOO]Y\Y]]KY
-HÈ	ÑY]	È	ÐÜX]IßHY\YÜÜØ[Ù]]ÛÛXÚÏ^Ê
-OOÜÙ]ÚÝÕY\[Ù[
-[ÙJNÜÙ]Y\Y]]J[
-__HÝ[O^ÞØÝ\ÛÜÜÚ[\ËÛÚ^NÛÛÜÈÎMLØ	Ë[RZYÚ__OLÌMOÙ]Ù]]Ý[O^ÞÜY[ÎÌM	ß_O]Ý[O^ÞÛX\Ú[ÝÛNL_O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_OÜÜØ[[YOÙ][]Û\ÜÓ[YOH[[YO^ÝY\Y]]K[Y_HÛÚ[ÙO^ÙOOÙ]Y\Y]]JËY\Y]]K[YNK\Ù][Y_J_HÝ[O^ÞÝÚYÌL	IËY[ÎÌLL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎÛÛÜÈÙYYIËÛÚ^NM_HÏÙ]]Ý[O^ÞÙ\Ü^NÙ^	ËØ\X\Ú[ÝÛNL^Ü\ÝÜ\	Ë[YÛ][\ÎØÙ[\ß_OÝY\Y]]KY\ËX\
-
-JOO]Ù^O^Ú_HÛÛXÚÏ^Ê
-OOÙ]Y\Y]]JËY\Y]]KXÝ]UY\Y_J_HÝ[O^ÞÙ\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\ËØ\Y[ÎÎM	ËÜ\Y]\ÎLÝ\ÛÜÜÚ[\ËXÚÙÜÝ[Y\Y]]KXÝ]UY\YOOZOÝÛÛÜÉÌÎÈÌYLLØËÜ\Y\Y]]KXÝ]UY\YOOZOÉÌÛÛY	ÊÝÛÛÜÌÛÛYÌÌÍMMIË[Ú][ÛØ[Éß_OÜ[Ý[O^ÞÙÛÚ^NM_OÝXÛÛOÜÜ[Ü[Ý[O^ÞÙÛÙZYÚÛÚ^NLËÛÛÜY\Y]]KXÝ]UY\YOOZOÝÛÛÜÈÎMLØ	ß_OÝ[Y_OÜÜ[Ù]_BÝY\Y]]KY\Ë[Ý
-H	]ÛÛXÚÏ^ØYY\ÔÜÜØ[HÝ[O^ÞÜY[ÎÎM	ËÜ\Y]\ÎLÝ\ÛÜÜÚ[\ËÜ\Ì\ÚYÌÌÍMMIËÛÚ^NLËÛÛÜÈÍ
-Íß_OÈYY\Ù]BÙ]Ê
-
-HOÂÛÛÝHHY\Y]]KXÝ]UY\YÂÛÛÝY\HY\Y]]KY\ÖÝWNÂY
-]Y\H]\[Â]\]Ý[O^ÞØÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎLY[ÎMXÚÙÜÝ[ÈÌMÌIß_O]Ý[O^ÞÙ\Ü^NÙ^	ËØ\X\Ú[ÝÛNL_O]Ý[O^ÞÙ^__O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_OY\[YOÙ][]Û\ÜÓ[YOH[[YO^ÝY\[Y_HÛÚ[ÙO^ÙOO\]UY\Y[
-K	Û[YIËK\Ù][YJ_HÝ[O^ÞÝÚYÌL	IËY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎÛÛÜÈÙYYIËÛÚ^NLß_HÏÙ]]Ý[O^ÞÝÚY_O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_OÛÛÜÙ][]\OHÛÛÜ[YO^ÝY\ÛÛÜHÛÚ[ÙO^ÙOO\]UY\Y[
-K	ØÛÛÜËK\Ù][YJ_HÝ[O^ÞÝÚYÌL	IËZYÚÍKY[ÎXÚÙÜÝ[ÈÌYLLØËÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎÝ\ÛÜÜÚ[\ß_HÏÙ]ÝY\Y]]KY\Ë[Ý	]Ý[O^ÞÙ\Ü^NÙ^	Ë[YÛ][\ÎÙ^Y[	ËY[ÐÝÛN_O]ÛÛXÚÏ^Ê
-OO[[ÝUY\ÛTÜÜØ[
-J_HÝ[O^ÞÜY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÝ\ÛÜÜÚ[\ËÛÛÜÈÙY
-
-
-	ËÛÚ^NL_OLÌMOÙ]Ù]BÙ]]Ý[O^ÞÛX\Ú[ÝÛNL_O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_O\ØÜ\[ÛÙ]^\XHÛ\ÜÓ[YOH[[YO^ÝY\\ØÜ\[ÛHÛÚ[ÙO^ÙOO\]UY\Y[
-K	Ù\ØÜ\[ÛËK\Ù][YJ_HÝÜÏ^ÌHÝ[O^ÞÝÚYÌL	IËY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎÛÛÜÈÙYYIËÛÚ^NLË\Ú^NÝ\XØ[	ß_HÏÙ]]Ý[O^ÞÙ\Ü^NÙ^	ËØ\X\Ú[ÝÛNL_O]Ý[O^ÞÙ^__O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_OØ\[OÙ][]Û\ÜÓ[YOH[[YO^ÝY\Ø\[_HÛÚ[ÙO^ÙOO\]UY\Y[
-K	ÝØ\[IËK\Ù][YJ_HÝ[O^ÞÝÚYÌL	IËY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎÛÛÜÈÙYYIËÛÚ^NLß_HÏÙ]]Ý[O^ÞÙ^__O]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛN^[ÙÜNÝ\\Ø\ÙIß_OÝ\ÏÙ][]Û\ÜÓ[YOH[[YO^ÝY\Ý\ßHÛÚ[ÙO^ÙOO\]UY\Y[
-K	ÛÝ\ÉËK\Ù][YJ_HÝ[O^ÞÝÚYÌL	IËY[ÎÎL	ËXÚÙÜÝ[ÈÌYLLØËÜ\Ì\ÛÛYÌÌÍMMIËÜ\Y]\ÎÛÛÜÈÙYYIËÛÚ^NLß_HÏÙ]Ù]]Ý[O^ÞÙ\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\ËØ\X\Ú[ÝÛN_O[]\OHÚXÚØÞÚXÚÙY^ÈH]Y\XÛÛ[Y[YHÛÚ[ÙO^ÙOO\]UY\Y[
-K	ÜXÛÛ[Y[Y	ËK\Ù]ÚXÚÙY
-_HÝ[O^ÞØXØÙ[ÛÛÜY\ÛÛÜ_HÏÜ[Ý[O^ÞÙÛÚ^NLÛÛÜÈÎMLØ	ß_OX\È\ÈXÛÛ[Y[Y
-\Ý[YJOÜÜ[Ù]]Ý[O^ÞÙÛÚ^NLKÛÙZYÚÌ]\ÜXÚ[ÎKÛÛÜÈÍ
-ÍËX\Ú[ÝÛNX\Ú[ÜL^[ÙÜNÝ\\Ø\ÙIß_O[H][\ÏÙ]ÝY\][\Ë[ÝOOL	]Ý[O^ÞÝ^[YÛØÙ[\ËY[ÎÌM	ËÛÛÜÈÍ
-ÍMMIËÛÚ^NLß_OÈ][\ÈY]YÛH[[ÜHÜ[\X[X[KÙ]BÝY\][\ËX\
-
-]HO]Ù^O^ÚHÝ[O^ÞÙ\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\ËØ\Y[ÎÎ	ËÜ\ÝÛNÌ\ÛÛYÌYLLØß_O]Ý[O^ÞÙ^KÛÚ^NLËÛÛÜÈÙLN	ß_OÚ][Y_OÙ]]Ý[O^ÞÙ\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\ËØ\_O]ÛÛXÚÏ^Ê
-OO\]UY\][T]JK
-]]_JKLJ_HÝ[O^ÞÝÚYZYÚ\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\Ë\ÝYPÛÛ[ØÙ[\ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÝ\ÛÜÜÚ[\ËÛÛÜÈÎMLØ	ËÛÚ^NM_OOÙ]Ü[Ý[O^ÞÙÛÚ^NLËÛÛÜÈÙLN	ËZ[ÚY^[YÛØÙ[\ß_OÚ]]__OÜÜ[]ÛÛXÚÏ^Ê
-OO\]UY\][T]JK
-]]_JJÌJ_HÝ[O^ÞÝÚYZYÚ\Ü^NÙ^	Ë[YÛ][\ÎØÙ[\Ë\ÝYPÛÛ[ØÙ[\ËXÚÙÜÝ[ÈÌYLLØËÜ\Y]\ÎÝ\ÛÜÜÚ[\ËÛÛÜÈÎMLØ	ËÛÚ^NM_OÏÙ]Ù]]Ý[O^ÞÙÛÚ^NLËÛÛÜÈÎMLØ	ËZ[ÚY^[YÛÜYÚ	ß_OÝÚ[ÝËÕTSÖ_	É	ß^Ê
-]XÙ_
-J]]_JJKÑ^Y
-_OÙ]]ÛÛXÚÏ^Ê
-OO[[ÝR][QÛUY\K_HÝ[O^ÞØÝ\ÛÜÜÚ[\ËÛÛÜÈÙY
-
-
-
 // ————————————————————————————————————————————————————————————
 // add-tiered-proposals.mjs
 // Adds optional tiered proposal system (Good/Better/Best)
@@ -631,3 +386,4 @@ if (content !== original) {
 } else {
   console.log('[add-tiered-proposals] No changes made.');
 }
+
