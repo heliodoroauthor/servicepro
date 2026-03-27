@@ -175,6 +175,20 @@ content = content.slice(0, ctabEol + 1) + equipmentState + content.slice(ctabEol
 console.log('[add-equipment] PATCH 2: Injected equipment state + helpers after ctab');
 
 // ════════════════════════════════════════════
+// PATCH 2b: Add equipment state + helpers in JobsPage
+// ════════════════════════════════════════════
+const jobTabStateMarker = 'const [jobTab, setJobTab] = useState("details");';
+const jobTabStateIdx = content.indexOf(jobTabStateMarker);
+if (jobTabStateIdx === -1) {
+  console.error('[add-equipment] ERROR: Could not find jobTab state marker for Patch 2b');
+  process.exit(1);
+}
+const jobTabStateEol = content.indexOf('\n', jobTabStateIdx);
+
+content = content.slice(0, jobTabStateEol + 1) + equipmentState + content.slice(jobTabStateEol + 1);
+console.log('[add-equipment] PATCH 2b: Injected equipment state + helpers in JobsPage');
+
+// ════════════════════════════════════════════
 // PATCH 3: Add Equipment tab content in Client detail
 // ════════════════════════════════════════════
 const subMarker = '{ctab==="subscription" && (';
@@ -414,7 +428,7 @@ if (timelineIdx !== -1) {
   if (altIdx !== -1) {
     jobEquipInsertIdx = findConditionalBlockEnd(content, altMarker + ' && (');
     if (jobEquipInsertIdx === -1) {
-      const detailBodyMarker = '{ /* BODY */}';
+      const detailBodyMarker = '{/* BODY */}';
       const bodyIdx = content.indexOf(detailBodyMarker);
       if (bodyIdx !== -1) {
         const closingDiv = content.indexOf('</div>', content.lastIndexOf('}', content.indexOf('/* ===', bodyIdx + 500)));
@@ -436,61 +450,204 @@ if (jobEquipInsertIdx === -1) {
 }
 
 const jobEquipContent = `
-{jobTab==="equipment" && (
-<div style={{padding:16,maxWidth:540,margin:"0 auto"}}>
-<div style={{textAlign:"center",marginBottom:16}}>
-<div style={{fontSize:22,marginBottom:2}}>🔧</div>
-<div style={{fontSize:16,fontWeight:800,color:"var(--text)"}}>Equipment at Site</div>
-<div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>Equipment logged for this client. Manage from Client profile → Equipment tab.</div>
-</div>
-
-{(function(){
-var clientId = sel ? (typeof sel === "object" ? sel.clientId || sel.client : sel) : null;
-if (!clientId && cl) clientId = cl.id;
-var cEquip = [];
-try { var raw = JSON.parse(localStorage.getItem("sp_client_equipment_v1")||"{}"); cEquip = raw[clientId] || []; } catch(e){}
-
-if (cEquip.length === 0) return (
-<div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}>
-<div style={{fontSize:28,marginBottom:8}}>📋</div>
-<div style={{fontSize:13}}>No equipment logged for this client yet.</div>
-<div style={{fontSize:11,marginTop:4}}>Go to the Client profile → Equipment tab to add items.</div>
-</div>
-);
-
+{jobTab==="equipment" && (function(){
+var eqCid = sel ? sel.clientId : null;
+if (!eqCid) return (<div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}><div style={{fontSize:28,marginBottom:8}}>🔧</div><div style={{fontSize:13}}>No client linked to this job.</div></div>);
 return (
+<div style={{maxWidth:540,margin:"0 auto"}}>
+
+{/* HEADER */}
+<div style={{textAlign:"center",padding:"8px 0 12px"}}>
+<div style={{fontSize:22,marginBottom:2}}>🔧</div>
+<div style={{fontSize:11,fontWeight:800,color:"var(--text)",textTransform:"uppercase",letterSpacing:1.5}}>Equipment Checklist</div>
+<div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>Tap a category to document each piece of equipment at this property.</div>
+</div>
+
+{/* MODE TOGGLE */}
+<div style={{display:"flex",gap:0,marginBottom:14,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)"}}>
+<button onClick={function(){setEqMode("checklist");cancelEditEquip();}} style={{flex:1,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer",border:"none",background:eqMode==="checklist"?"var(--orange)":"var(--s2)",color:eqMode==="checklist"?"#fff":"var(--muted)"}}>📋 Checklist</button>
+<button onClick={function(){setEqMode("form");}} style={{flex:1,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer",border:"none",background:eqMode==="form"?"var(--orange)":"var(--s2)",color:eqMode==="form"?"#fff":"var(--muted)"}}>＋ Add Item</button>
+<button onClick={function(){setEqMode("list");}} style={{flex:1,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer",border:"none",background:eqMode==="list"?"var(--orange)":"var(--s2)",color:eqMode==="list"?"#fff":"var(--muted)"}}>📄 Log ({getClientEquip(eqCid).length})</button>
+</div>
+
+{/* ── CHECKLIST MODE ── */}
+{eqMode==="checklist" && (
 <div>
-{cEquip.map(function(item, idx){
-var preset = [{id:"controller",icon:"🎛"},{id:"backflow",icon:"🔄"},{id:"valve",icon:"🔧"},{id:"rain_sensor",icon:"🌧"},{id:"timer",icon:"⏱"},{id:"pump",icon:"⛽"},{id:"filter",icon:"🧹"},{id:"meter",icon:"📊"},{id:"sprinkler",icon:"💧"},{id:"drain",icon:"🕳"},{id:"pipe",icon:"🔩"},{id:"sensor",icon:"📡"},{id:"custom",icon:"✏️"}].find(function(p){return p.id===item.category;});
+<div style={{fontSize:10,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontWeight:700}}>Tap to document each item</div>
+{EQ_PRESETS.map(function(pr){
+var logged = getClientEquip(eqCid).filter(function(it){return it.category===pr.id;});
+var hasItem = logged.length > 0;
 return(
-<div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12,padding:16,marginBottom:10}}>
-<div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,flexShrink:0}}>{idx+1}</div>
-<div style={{flex:1}}>
-<div style={{fontWeight:700,fontSize:15,color:"var(--text)"}}>{preset?preset.icon+" ":""}{item.name}</div>
-{item.location && <div style={{fontSize:12,color:"var(--blue)",marginTop:3}}>📍 {item.location}</div>}
-{(item.brand||item.model) && <div style={{fontSize:12,color:"var(--muted)",marginTop:3}}>🏷 {[item.brand,item.model].filter(Boolean).join(" — ")}</div>}
-{item.description && <div style={{fontSize:12,color:"var(--muted)",marginTop:4,lineHeight:1.5}}>{item.description}</div>}
-{item.photos && item.photos.length > 0 && (
-<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
-{item.photos.map(function(url,pi){return(
-<div key={pi} style={{width:72,height:72,borderRadius:8,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer"}} onClick={function(){window.open(url,"_blank");}}>
-<img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+<div key={pr.id} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",marginBottom:6,background:hasItem?"rgba(255,140,0,.08)":"var(--s2)",border:"1px solid "+(hasItem?"var(--orange)":"var(--border)"),borderRadius:12,cursor:"pointer"}} onClick={function(){if(!hasItem){selectPreset(pr);}else{setEqMode("list");setEqExpanded(logged[0].id);}}}>
+<div style={{fontSize:24,width:36,textAlign:"center",flexShrink:0}}>{pr.icon}</div>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{pr.name}</div>
+<div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{pr.hint}</div>
+{hasItem && <div style={{fontSize:10,color:"var(--orange)",fontWeight:700,marginTop:3}}>✓ {logged.length} documented</div>}
 </div>
-);})}
-</div>
+<div style={{flexShrink:0}}>
+{hasItem ? (
+<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800}}>✓</div>
+) : (
+<div style={{background:"var(--surface)",border:"2px dashed var(--border)",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"var(--muted)"}}>+</div>
 )}
 </div>
 </div>
+);})}
+
+{/* PROGRESS BAR */}
+{(function(){
+var total = EQ_PRESETS.length;
+var done = EQ_PRESETS.filter(function(pr){return getClientEquip(eqCid).some(function(it){return it.category===pr.id;});}).length;
+var pct = total>0?Math.round((done/total)*100):0;
+return(
+<div style={{marginTop:14,padding:"12px 16px",background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+<span style={{fontSize:11,fontWeight:700,color:"var(--text)"}}>Site Survey Progress</span>
+<span style={{fontSize:12,fontWeight:800,color:pct===100?"var(--green)":"var(--orange)"}}>{pct}%</span>
 </div>
-);
-})}
-<div style={{fontSize:10,color:"var(--muted2)",textAlign:"center",marginTop:8,padding:"8px 0"}}>{cEquip.length} item{cEquip.length!==1?"s":""} at this site</div>
+<div style={{height:8,background:"var(--surface)",borderRadius:4,overflow:"hidden"}}>
+<div style={{height:"100%",width:pct+"%",background:pct===100?"var(--green)":"var(--orange)",borderRadius:4,transition:"width .3s"}}></div>
+</div>
+<div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>{done} of {total} categories documented · {getClientEquip(eqCid).length} total items</div>
 </div>
 );
 })()}
 </div>
 )}
+
+{/* ── FORM MODE ── */}
+{eqMode==="form" && (
+<div>
+{/* CATEGORY SELECTOR */}
+<div style={{fontSize:10,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:700}}>{eqEditId ? "Editing Item" : "Select Category"}</div>
+<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+{EQ_PRESETS.map(function(pr){return(
+<button key={pr.id} onClick={function(){selectPreset(pr);}} style={{background:eqForm.category===pr.id?"var(--orange)":"var(--s2)",color:eqForm.category===pr.id?"#fff":"var(--muted)",border:"1px solid "+(eqForm.category===pr.id?"var(--orange)":"var(--border)"),borderRadius:20,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+<span>{pr.icon}</span>{pr.name}
+</button>
+);})}
+</div>
+
+{/* FORM FIELDS */}
+<div style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12,padding:16,marginBottom:14}}>
+<div style={{display:"flex",flexDirection:"column",gap:10}}>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Equipment Name *</div>
+<input className="inp" value={eqForm.name} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{name:e.target.value});});}} placeholder="e.g. Hunter Pro-C Controller" style={{fontSize:14,padding:"12px 14px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Exact Location</div>
+<input className="inp" value={eqForm.location} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{location:e.target.value});});}} placeholder="e.g. Garage north wall, left side" style={{fontSize:14,padding:"12px 14px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Brand</div>
+<input className="inp" value={eqForm.brand} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{brand:e.target.value});});}} placeholder="e.g. Hunter" style={{fontSize:13,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Model</div>
+<input className="inp" value={eqForm.model} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{model:e.target.value});});}} placeholder="e.g. Pro-C" style={{fontSize:13,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+</div>
+
+<div>
+<div style={{fontSize:10,fontWeight:700,color:"var(--muted2)",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Notes / Description</div>
+<textarea className="inp" value={eqForm.description} onChange={function(e){setEqForm(function(p){return Object.assign({},p,{description:e.target.value});});}} placeholder="Serial number, condition, zones, notes..." rows={3} style={{fontSize:13,padding:"10px 12px",width:"100%",boxSizing:"border-box"}}/>
+</div>
+</div>
+</div>
+
+{/* PHOTO UPLOAD */}
+<div style={{marginBottom:14}}>
+<input ref={eqFileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={uploadEqPhoto}/>
+<button onClick={function(){eqFileRef.current.click();}} disabled={eqUploading} style={{width:"100%",padding:"14px",background:"var(--surface)",border:"2px dashed var(--border)",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",color:"var(--text)",opacity:eqUploading?.5:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+{eqUploading ? "⏳ Uploading..." : "📸 Take Photo or Upload"}
+</button>
+{eqPhotos.length > 0 && (
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+{eqPhotos.map(function(url,i){return(
+<div key={i} style={{position:"relative",width:72,height:72,borderRadius:10,overflow:"hidden",border:"2px solid var(--border)"}}>
+<img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+<button onClick={function(){removeEqPhoto(i);}} style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,.75)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+</div>
+);})}
+<div style={{fontSize:10,color:"var(--muted)",alignSelf:"center"}}>{eqPhotos.length} photo{eqPhotos.length!==1?"s":""}</div>
+</div>
+)}
+</div>
+
+{/* ACTION BUTTONS */}
+<button onClick={function(){saveEquipItem(eqCid);}} disabled={!eqForm.name.trim()} style={{width:"100%",padding:"14px",background:"var(--orange)",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",opacity:eqForm.name.trim()?1:.4,marginBottom:8}}>
+{eqEditId ? "💾 Update Equipment" : "✓ Save to Checklist"}
+</button>
+{eqEditId && <button onClick={cancelEditEquip} style={{width:"100%",padding:"12px",background:"var(--surface)",color:"var(--muted)",border:"1px solid var(--border)",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>}
+{!eqEditId && <button onClick={function(){setEqMode("checklist");setEqForm({name:"",category:"",description:"",location:"",brand:"",model:""});setEqPhotos([]);}} style={{width:"100%",padding:"12px",background:"transparent",color:"var(--muted)",border:"none",fontSize:12,cursor:"pointer"}}>← Back to Checklist</button>}
+</div>
+)}
+
+{/* ── LIST MODE ── */}
+{eqMode==="list" && (
+<div>
+{getClientEquip(eqCid).length === 0 ? (
+<div style={{textAlign:"center",padding:"40px 0",color:"var(--muted)"}}>
+<div style={{fontSize:28,marginBottom:8}}>📋</div>
+<div style={{fontSize:13}}>No equipment logged yet.</div>
+<div style={{fontSize:11,marginTop:4,color:"var(--muted2)"}}>Switch to Checklist mode to start documenting.</div>
+</div>
+) : (
+<div>
+{getClientEquip(eqCid).map(function(item, idx){
+var preset = EQ_PRESETS.find(function(p){return p.id===item.category;});
+var isExpanded = eqExpanded === item.id;
+return(
+<div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:12,marginBottom:8,overflow:"hidden"}}>
+<div onClick={function(){setEqExpanded(isExpanded?null:item.id);}} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer"}}>
+<div style={{background:"var(--orange)",color:"#fff",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,flexShrink:0}}>{idx+1}</div>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontWeight:700,fontSize:14,color:"var(--text)"}}>{preset?preset.icon+" ":""}{item.name}</div>
+{item.location && <div style={{fontSize:12,color:"var(--blue)",marginTop:2}}>📍 {item.location}</div>}
+{(item.brand||item.model) && <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{[item.brand,item.model].filter(Boolean).join(" · ")}</div>}
+</div>
+{item.photos && item.photos.length > 0 && <span style={{fontSize:11,color:"var(--muted)",flexShrink:0,background:"var(--surface)",padding:"3px 8px",borderRadius:10}}>📷 {item.photos.length}</span>}
+<span style={{fontSize:18,color:"var(--muted)",transform:isExpanded?"rotate(180deg)":"rotate(0)",transition:"transform .2s",flexShrink:0}}>▾</span>
+</div>
+
+{isExpanded && (
+<div style={{padding:"0 16px 16px",borderTop:"1px solid var(--border)"}}>
+{item.description && <div style={{fontSize:13,color:"var(--muted)",marginTop:12,lineHeight:1.6}}>{item.description}</div>}
+{(item.brand||item.model) && <div style={{fontSize:11,color:"var(--muted2)",marginTop:6}}>🏷 {[item.brand,item.model].filter(Boolean).join(" — ")}</div>}
+{item.addedDate && <div style={{fontSize:10,color:"var(--muted2)",marginTop:4}}>Added: {item.addedDate}</div>}
+
+{item.photos && item.photos.length > 0 && (
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+{item.photos.map(function(url,pi){return(
+<div key={pi} style={{width:80,height:80,borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",cursor:"pointer"}} onClick={function(e){e.stopPropagation();window.open(url,"_blank");}}>
+<img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+</div>
+);})}
+</div>
+)}
+
+<div style={{display:"flex",gap:8,marginTop:12}}>
+<button onClick={function(e){e.stopPropagation();startEditEquip(item);}} style={{flex:1,padding:"10px",background:"var(--surface)",color:"var(--blue)",border:"1px solid var(--border)",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>✏️ Edit</button>
+<button onClick={function(e){e.stopPropagation();if(confirm("Remove "+item.name+"?"))deleteEquipItem(eqCid,item.id);}} style={{flex:1,padding:"10px",background:"var(--surface)",color:"var(--red)",border:"1px solid var(--border)",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>🗑 Remove</button>
+</div>
+</div>
+)}
+</div>
+);})}
+<div style={{fontSize:10,color:"var(--muted2)",textAlign:"center",marginTop:8,padding:"8px 0"}}>{getClientEquip(eqCid).length} item{getClientEquip(eqCid).length!==1?"s":""} logged at this property</div>
+</div>
+)}
+</div>
+)}
+
+</div>
+);
+})()}
 `;
 
 if (jobEquipInsertIdx !== -1) {
