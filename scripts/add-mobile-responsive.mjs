@@ -1,462 +1,187 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// ═══════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // add-mobile-responsive.mjs
 // Comprehensive mobile-first responsive optimization
 // Injects CSS media queries + patches inline styles that cause
 // horizontal overflow on small screens (< 480px)
-// ═══════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 const file = 'src/ServiceProApp.jsx';
 let content = readFileSync(file, 'utf8');
 const original = content;
 
-// ── STEP 1: Inject mobile CSS into the <style> tag inside ServiceProApp.jsx ──
-// NOTE: index.css is NOT imported by main.jsx — all CSS lives inside a <style> tag in the JSX
+// ââ STEP 1: Inject mobile CSS into the <style> tag inside ServiceProApp.jsx ââ
+// NOTE: index.css is NOT imported by main.jsx â all CSS lives inside a <style> tag in the JSX
 
 const mobileCss = `
-/* ═══════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
    MOBILE-FIRST RESPONSIVE OVERHAUL
    Targets: phones < 480px and tablets < 768px
-   ═══════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════ */
 
-/* ── Global mobile resets ────────────────────────────── */
-@media (max-width: 639px) {
-  /* Prevent ANY horizontal overflow */
-  html, body, #root, .app {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  .main {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  .page {
-    padding: 10px;
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
+/* ——— GLOBAL MOBILE RESET (< 768px) ——— */
+@media(max-width:768px){
+  html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important}
+  *{box-sizing:border-box!important}
 
-  /* ── Mobile topbar improvements ──────────────────── */
-  .mobile-topbar {
-    padding: 0 10px;
-    gap: 6px;
-  }
+  /* ——— CORE LAYOUT ——— */
+  .app{flex-direction:column!important;width:100%!important;max-width:100vw!important;overflow-x:hidden!important}
 
-  /* ── Stats grid: 2 columns on mobile ─────────────── */
-  .stats {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 8px;
-  }
-  .stat {
-    padding: 12px 14px;
-  }
-  .sv { font-size: 22px; }
-  .sl { font-size: 8px; letter-spacing: 1px; }
-  .ss { font-size: 9px; }
+  /* Hide desktop sidebar + topbar */
+  .sb{display:none!important}
+  .topbar{display:none!important}
 
-  /* ── Cards: tighter padding ──────────────────────── */
-  .card {
-    border-radius: 10px;
-  }
-  .ch {
-    padding: 10px 14px;
-  }
-  .cb {
-    padding: 10px 14px;
-  }
+  /* Show mobile topbar */
+  .mobile-topbar{display:flex!important}
 
-  /* ── Tables: make scrollable in container ─────────── */
-  table {
-    min-width: 320px;
-    font-size: 11px;
-  }
-  th { padding: 8px 10px; font-size: 8px; }
-  td { padding: 9px 10px; font-size: 11px; }
+  /* Show bottom navigation */
+  .bottom-nav{display:flex!important;position:fixed!important;bottom:0!important;left:0!important;right:0!important;z-index:9999!important;background:#1a1a2e!important;border-top:1px solid rgba(255,255,255,.1)!important;padding:4px 0 env(safe-area-inset-bottom,4px)!important}
+  .bn-item{flex:1!important;display:flex!important;flex-direction:column!important;align-items:center!important;padding:6px 2px!important;font-size:10px!important;min-height:44px!important;justify-content:center!important}
+  .bn-item-icon{font-size:20px!important}
 
-  /* ── Modals: full width on mobile ────────────────── */
-  .modal {
-    max-width: 100vw;
-    border-radius: 16px 16px 0 0;
-    max-height: 92vh;
-  }
-  .mh { padding: 12px 16px; }
-  .mb2 { padding: 14px 16px; }
-  .mf { padding: 10px 16px; }
-  .mt2 { font-size: 17px; }
+  /* Fix main content area */
+  .main{margin-left:0!important;width:100%!important;max-width:100vw!important;min-width:0!important;flex:1!important;padding-bottom:72px!important;overflow-x:hidden!important}
+  .page{padding:10px!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow-x:hidden!important}
 
-  /* ── Forms: larger touch targets ─────────────────── */
-  .inp {
-    font-size: 16px; /* prevents iOS zoom on focus */
-    min-height: 48px;
-    padding: 12px 14px;
-  }
-  textarea.inp {
-    min-height: 80px;
-  }
-  .fg label {
-    font-size: 10px;
-    margin-bottom: 5px;
-  }
+  /* Drawer overlay for hamburger menu */
+  .drawer-overlay.open{display:block!important}
+  .drawer.open{display:flex!important;position:fixed!important;top:0!important;left:0!important;bottom:0!important;z-index:10000!important;width:280px!important;max-width:80vw!important}
 
-  /* ── Buttons: bigger touch targets ───────────────── */
-  .btn {
-    min-height: 48px;
-    padding: 12px 18px;
-    font-size: 13px;
-    border-radius: 10px;
-  }
-  .btn-sm {
-    min-height: 40px;
-    padding: 9px 14px;
-    font-size: 11px;
-  }
-  .btn-lg {
-    min-height: 52px;
-    padding: 14px 24px;
-    font-size: 15px;
-  }
+  /* ——— DASHBOARD / HOME ——— */
+  .stats{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:8px!important;width:100%!important}
+  .stat,.sv{flex:1 1 45%!important;min-width:0!important;padding:10px!important;font-size:13px!important}
+  .sl,.ss{width:100%!important;min-width:0!important}
+  .card .g2,.card .g3,.g2,.g3{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;width:100%!important}
+  .split,.split-3-2{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important}
 
-  /* ── Layout: single column on mobile ─────────────── */
-  .split, .split-3-2, .split-client {
-    grid-template-columns: 1fr !important;
-    gap: 10px;
-  }
-  .g2 { grid-template-columns: 1fr !important; }
-  .g3 { grid-template-columns: 1fr !important; }
+  /* ——— CARDS & CONTAINERS ——— */
+  .card{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;margin-left:0!important;margin-right:0!important;border-radius:10px!important}
+  .ch{padding:12px!important;font-size:14px!important}
+  .cb{padding:12px!important}
 
-  /* ── Search bar: full width ──────────────────────── */
-  .search-bar {
-    font-size: 16px;
-    min-height: 44px;
-    padding: 10px 12px 10px 36px;
-  }
+  /* ——— MODALS ——— */
+  .modal{width:95vw!important;max-width:95vw!important;max-height:90vh!important;margin:2.5vh auto!important;overflow-y:auto!important;border-radius:12px!important}
+  .mh{padding:14px!important;font-size:16px!important}
+  .mb2{padding:12px!important}
+  .mf{padding:12px!important;flex-wrap:wrap!important;gap:8px!important}
+  .mt2{padding:12px!important}
 
-  /* ── Detail screen (Job/Invoice) ─────────────────── */
-  .detail-screen {
-    overflow-x: hidden;
-  }
-  .detail-topbar {
-    padding: 0 10px;
-    height: 50px;
-    gap: 8px;
-  }
-  .detail-title {
-    font-size: 17px;
-  }
-  .detail-body {
-    overflow-x: hidden;
-  }
+  /* ——— INPUTS & FORMS ——— */
+  input,select,textarea{width:100%!important;max-width:100%!important;min-height:44px!important;font-size:16px!important;box-sizing:border-box!important;border-radius:8px!important}
+  .inp{width:100%!important;min-height:44px!important;font-size:16px!important}
+  .fg{width:100%!important;margin-bottom:10px!important}
+  .search-bar{width:100%!important;max-width:100%!important;box-sizing:border-box!important}
 
-  /* ── Job action buttons: wrap nicely ─────────────── */
-  .action-row {
-    padding: 12px 10px;
-    gap: 4px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    flex-wrap: nowrap;
-  }
-  .action-btn {
-    min-width: 56px;
-    padding: 6px 2px;
-  }
-  .action-btn-icon {
-    width: 44px;
-    height: 44px;
-    font-size: 18px;
-  }
-  .action-btn span {
-    font-size: 9px;
-  }
+  /* ——— BUTTONS ——— */
+  .btn{min-height:44px!important;min-width:44px!important;font-size:14px!important;padding:10px 16px!important;border-radius:8px!important}
+  .btn-sm{min-height:38px!important;font-size:13px!important;padding:8px 12px!important}
+  .btn-lg{min-height:50px!important;font-size:16px!important;padding:12px 20px!important;width:100%!important}
+  .action-btn{min-height:44px!important;padding:10px!important;font-size:13px!important;flex:1 1 auto!important}
+  .action-btn-icon{font-size:18px!important}
+  .wf-btn{min-height:44px!important;padding:10px 14px!important;font-size:13px!important}
+  .wf-actions{flex-wrap:wrap!important;gap:6px!important}
+  .fab{position:fixed!important;bottom:80px!important;right:16px!important;z-index:9998!important;min-width:48px!important;min-height:48px!important;border-radius:50%!important}
 
-  /* ── Expand sections ─────────────────────────────── */
-  .expand-header {
-    padding: 12px 14px;
-    min-height: 48px;
-  }
-  .expand-header-left {
-    font-size: 14px;
-    gap: 8px;
-  }
+  /* ——— TABS ——— */
+  .tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:4px!important;width:100%!important;-webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;padding-bottom:4px!important}
+  .tabs::-webkit-scrollbar{display:none!important}
+  .tab{flex:0 0 auto!important;min-width:0!important;font-size:12px!important;padding:8px 12px!important;white-space:nowrap!important;border-radius:20px!important}
+  .ctab-row{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:4px!important;width:100%!important;scrollbar-width:none!important}
+  .ctab-row::-webkit-scrollbar{display:none!important}
+  .ctab{flex:0 0 auto!important;font-size:12px!important;padding:8px 12px!important;white-space:nowrap!important}
+  .sched-toggle{display:flex!important;flex-wrap:nowrap!important;gap:2px!important;overflow-x:auto!important}
+  .sched-toggle-btn{font-size:13px!important;padding:8px 14px!important;white-space:nowrap!important}
+  .portal-tab-bar{flex-wrap:nowrap!important;overflow-x:auto!important;gap:2px!important;scrollbar-width:none!important}
+  .portal-tab-bar::-webkit-scrollbar{display:none!important}
+  .portal-tab-btn{font-size:12px!important;padding:8px 10px!important;white-space:nowrap!important}
+  .prop-detail-tabs{flex-wrap:nowrap!important;overflow-x:auto!important;scrollbar-width:none!important}
+  .prop-detail-tabs::-webkit-scrollbar{display:none!important}
+  .pdt-btn{font-size:12px!important;padding:8px 10px!important;white-space:nowrap!important}
 
-  /* ── Client detail tabs: scrollable ──────────────── */
-  .ctab-row {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 3px;
-    gap: 1px;
-  }
-  .ctab-row::-webkit-scrollbar { display: none; }
-  .ctab {
-    padding: 0 10px;
-    height: 34px;
-    font-size: 10px;
-    flex-shrink: 0;
-  }
+  /* ——— JOBS SECTION ——— */
+  .job-card{width:100%!important;box-sizing:border-box!important}
+  .job-map{height:150px!important;border-radius:8px!important}
+  .job-map-addr{font-size:12px!important}
 
-  /* ── Client hero ─────────────────────────────────── */
-  .client-hero {
-    padding: 14px 16px;
-  }
-  .client-hero-name {
-    font-size: 19px;
-  }
+  /* ——— SCHEDULE / CALENDAR ——— */
+  .sched-header{flex-wrap:wrap!important;gap:8px!important}
+  .cal-grid{font-size:10px!important;gap:1px!important;width:100%!important;table-layout:fixed!important}
+  .cal-day{min-height:36px!important;padding:2px!important;font-size:9px!important;overflow:hidden!important}
+  .cal-dot{width:6px!important;height:6px!important}
 
-  /* ── Client rows ─────────────────────────────────── */
-  .client-row {
-    padding: 11px 14px;
-    gap: 10px;
-    min-height: 60px;
-  }
+  /* ——— CLIENTS SECTION ——— */
+  .split-client{display:flex!important;flex-direction:column!important;gap:0!important;width:100%!important}
+  .split-client>div:first-child{width:100%!important;max-height:35vh!important;overflow-y:auto!important;border-right:none!important;border-bottom:1px solid rgba(255,255,255,.1)!important}
+  .split-client>div:last-child{width:100%!important;flex:1!important}
+  .client-hero{flex-direction:column!important;text-align:center!important;gap:8px!important;padding:12px!important}
+  .client-hero-name{font-size:18px!important}
+  .client-row{flex-direction:column!important;gap:4px!important}
+  .client-qa{width:100%!important;flex-wrap:wrap!important;gap:6px!important}
+  .client-qa-btn{flex:1 1 auto!important;min-height:44px!important;font-size:13px!important}
+  .info-row{flex-direction:column!important;gap:2px!important;padding:8px 0!important}
+  .info-val{font-size:14px!important;word-break:break-word!important}
 
-  /* ── Client quick actions ────────────────────────── */
-  .client-qa {
-    padding: 10px 14px;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .client-qa-btn {
-    min-width: 0;
-    flex: 1 1 calc(50% - 4px);
-    height: 44px;
-    font-size: 12px;
-    gap: 5px;
-    border-radius: 10px;
-  }
+  /* ——— EQUIPMENT ——— */
+  .property-grid,.robot-grid,.robot-detail-grid{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important}
+  .telemetry-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;width:100%!important}
 
-  /* ── Info rows ───────────────────────────────────── */
-  .info-row {
-    gap: 8px;
-  }
-  .info-val {
-    font-size: 13px;
-    word-break: break-word;
-  }
+  /* ——— TABLES ——— */
+  table{display:block!important;overflow-x:auto!important;max-width:100%!important;font-size:12px!important;-webkit-overflow-scrolling:touch!important}
+  .stock-table{overflow-x:auto!important;max-width:100%!important;-webkit-overflow-scrolling:touch!important}
+  th,td{padding:6px 8px!important;font-size:12px!important;white-space:nowrap!important}
 
-  /* ── Job card list ───────────────────────────────── */
-  .job-card {
-    padding: 10px;
-  }
+  /* ——— DETAIL SCREENS ——— */
+  .detail-screen{width:100%!important;max-width:100%!important;min-width:0!important}
+  .detail-topbar{flex-wrap:wrap!important;gap:8px!important;padding:10px!important}
+  .detail-title{font-size:16px!important}
+  .detail-body{padding:10px!important}
+  .action-row{display:flex!important;flex-wrap:wrap!important;gap:6px!important;width:100%!important}
 
-  /* ── Job map ─────────────────────────────────────── */
-  .job-map {
-    height: 160px;
-  }
-  .job-map-addr {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    padding: 6px 10px;
-    gap: 6px;
-  }
-  .job-map-addr span {
-    font-size: 11px !important;
-  }
+  /* ——— CRM BOARD ——— */
+  .crm-board{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important}
+  .crm-col{width:100%!important;min-width:0!important;max-width:100%!important}
 
-  /* ── Mobile list items ───────────────────────────── */
-  .mobile-list-item {
-    padding: 12px 14px;
-    gap: 10px;
-    min-height: 64px;
-  }
-  .mli-name { font-size: 13px; }
-  .mli-amt { font-size: 16px; }
+  /* ——— PAYMENTS ——— */
+  .pay-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;width:100%!important}
+  .pay-opt{padding:12px!important;min-height:60px!important}
+  .pay-icon{font-size:24px!important}
+  .pay-label{font-size:12px!important}
+  .send-inv-field{width:100%!important}
 
-  /* ── Bottom nav: ensure safe area ────────────────── */
-  .bottom-nav {
-    padding: 4px 0 max(env(safe-area-inset-bottom, 4px), 4px);
-  }
-  .bn-item {
-    min-height: 48px;
-    font-size: 8px;
-    padding: 4px 2px;
-  }
-  .bn-item-icon { font-size: 18px; }
+  /* ——— MEDIA / PHOTOS ——— */
+  .media-grid{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:6px!important;width:100%!important}
+  .photo-thumb{width:100%!important;height:auto!important;aspect-ratio:1!important;object-fit:cover!important;border-radius:6px!important}
+  .photo-add{width:100%!important;min-height:80px!important}
+  .upload-zone{width:100%!important;padding:20px!important}
+  .upload-zone-label{font-size:13px!important}
 
-  /* ── Payment grid ────────────────────────────────── */
-  .pay-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 6px;
-  }
-  .pay-opt {
-    padding: 8px 4px;
-    min-height: 44px;
-  }
-  .pay-icon { font-size: 18px; }
-  .pay-label { font-size: 7px; }
+  /* ——— MISC ——— */
+  .expand-header{flex-wrap:wrap!important;gap:8px!important}
+  .expand-header-left{min-width:0!important;flex:1!important}
+  .badge{font-size:10px!important;padding:2px 6px!important}
+  .mobile-list-item{padding:12px!important}
+  .mli-name{font-size:14px!important}
+  .mli-amt{font-size:14px!important}
 
-  /* ── CRM Kanban ──────────────────────────────────── */
-  .crm-board {
-    flex-direction: column;
-    min-height: auto;
-    gap: 10px;
-  }
-  .crm-col {
-    width: 100%;
-    flex-shrink: 1;
-  }
-
-  /* ── Badges ──────────────────────────────────────── */
-  .badge {
-    font-size: 8px;
-    padding: 2px 7px;
-  }
-
-  /* ── Photo grid ──────────────────────────────────── */
-  .photo-thumb {
-    width: 64px;
-    height: 64px;
-  }
-  .photo-add {
-    width: 64px;
-    height: 64px;
-  }
-
-  /* ── Media grid ──────────────────────────────────── */
-  .media-grid {
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-    gap: 6px;
-  }
-
-  /* ── Property grid ───────────────────────────────── */
-  .property-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* ── Robot grid ──────────────────────────────────── */
-  .robot-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .robot-detail-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* ── Upload zone ─────────────────────────────────── */
-  .upload-zone {
-    padding: 20px 14px;
-  }
-  .upload-zone-label { font-size: 13px; }
-
-  /* ── Workflow stepper ────────────────────────────── */
-  .wf-actions {
-    flex-direction: column;
-  }
-  .wf-btn {
-    min-width: 100%;
-    padding: 14px;
-    font-size: 15px;
-  }
-
-  /* ── Tabs (generic) ──────────────────────────────── */
-  .tabs {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    padding: 5px 10px;
-    font-size: 10px;
-    flex-shrink: 0;
-  }
-
-  /* ── Portal tabs ─────────────────────────────────── */
-  .portal-tab-bar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 6px;
-  }
-  .portal-tab-bar::-webkit-scrollbar { display: none; }
-  .portal-tab-btn {
-    flex-shrink: 0;
-    padding: 7px 12px;
-    font-size: 11px;
-  }
-
-  /* ── Property detail tabs ────────────────────────── */
-  .prop-detail-tabs {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .prop-detail-tabs::-webkit-scrollbar { display: none; }
-  .pdt-btn {
-    flex-shrink: 0;
-    padding: 7px 12px;
-    font-size: 12px;
-  }
-
-  /* ── Send invoice fields ─────────────────────────── */
-  .send-inv-field {
-    padding: 12px 14px;
-  }
-
-  /* ── Notifications / Toasts ──────────────────────── */
-  .fab {
-    bottom: 72px;
-    right: 14px;
-  }
-
-  /* ── Stock table ─────────────────────────────────── */
-  .stock-table th, .stock-table td {
-    padding: 7px 8px;
-    font-size: 11px;
-  }
-
-  /* ── Telemetry grid ──────────────────────────────── */
-  .telemetry-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  /* ── Calendar ────────────────────────────────────── */
-  .cal-grid {
-    gap: 1px;
-    padding: 4px;
-  }
-  .cal-day {
-    min-height: 40px;
-    padding: 2px;
-    font-size: 9px;
-  }
-  .cal-dot {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
-  /* ── Dispatch tech cards ─────────────────────────── */
-  .tc {
-    padding: 10px;
-  }
-  .tc-name { font-size: 13px; }
-
-  /* ── Messages ────────────────────────────────────── */
-  .msg-out, .msg-in {
-    max-width: 85%;
-    font-size: 13px;
-    padding: 10px 14px;
-  }
-
-  /* ── Section card ────────────────────────────────── */
-  .section-card {
-    padding: 12px;
-  }
+  /* ——— GENERIC OVERFLOW FIXES ——— */
+  div[style*="display: flex"][style*="gap"]{flex-wrap:wrap!important}
+  div[style*="overflow-x: auto"]{-webkit-overflow-scrolling:touch!important}
+  img,video,canvas,svg{max-width:100%!important;height:auto!important}
 }
 
-/* ── Extra small screens (< 360px) ───────────────── */
-@media (max-width: 359px) {
-  .stats {
-    grid-template-columns: 1fr !important;
-  }
-  .pay-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  .client-qa-btn {
-    flex: 1 1 100%;
-  }
-  .sv { font-size: 20px; }
+/* ——— EXTRA-SMALL PHONES (< 380px) ——— */
+@media(max-width:380px){
+  .page{padding:6px!important}
+  .card{border-radius:8px!important}
+  .stats .stat,.stats .sv{flex:1 1 100%!important}
+  .btn{font-size:13px!important;padding:8px 12px!important}
+  .tab,.ctab{font-size:11px!important;padding:6px 8px!important}
+  .pay-grid{grid-template-columns:1fr!important}
+  .media-grid{grid-template-columns:repeat(2,1fr)!important}
+  .cal-day{font-size:8px!important;min-height:30px!important}
+  .telemetry-grid{grid-template-columns:1fr!important}
+  .modal{width:100vw!important;max-width:100vw!important;border-radius:0!important;margin:0!important;max-height:100vh!important}
 }
 `;
 
@@ -482,16 +207,16 @@ if (styleIdx !== -1) {
   process.exit(1);
 }
 
-// ── STEP 2: Patch inline styles in ServiceProApp.jsx that cause overflow ──
+// ââ STEP 2: Patch inline styles in ServiceProApp.jsx that cause overflow ââ
 
 let patchCount = 0;
 
-// PATCH A: Dashboard hero badges row — ensure wrapping on mobile
+// PATCH A: Dashboard hero badges row â ensure wrapping on mobile
 // The row has minWidth:76 buttons that overflow on small screens
 const heroRowMarker = 'style={{display:"flex",gap:10,alignItems:"center"}}>';
 const heroRow2 = content.indexOf('"val":todayCount');
 // Instead, let's fix the stats grid that uses repeat(auto-fill,minmax(140px,1fr))
-// The KPI strip — make it responsive
+// The KPI strip â make it responsive
 content = content.replace(
   'gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",marginBottom:16',
   'gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",marginBottom:16'
@@ -499,7 +224,7 @@ content = content.replace(
 patchCount++;
 console.log('[add-mobile-responsive] PATCH A: KPI strip grid minmax reduced');
 
-// PATCH B: Quick Actions strip — make buttons wrap instead of scroll
+// PATCH B: Quick Actions strip â make buttons wrap instead of scroll
 content = content.replace(
   'style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",paddingBottom:2}}',
   'style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",paddingBottom:2,flexWrap:"wrap",WebkitOverflowScrolling:"touch"}}'
@@ -507,10 +232,10 @@ content = content.replace(
 patchCount++;
 console.log('[add-mobile-responsive] PATCH B: Quick actions flex-wrap');
 
-// PATCH C: Dashboard split — uses className="split" which is already handled by CSS
+// PATCH C: Dashboard split â uses className="split" which is already handled by CSS
 // No inline patch needed.
 
-// PATCH D: Job detail tabs — make scrollable and smaller on mobile
+// PATCH D: Job detail tabs â make scrollable and smaller on mobile
 // The tabs already have overflowX:"auto" but let's add -webkit-overflow-scrolling
 content = content.replace(
   'style={{overflowX:"auto",scrollbarWidth:"none",background:"var(--surface)",borderBottom:"2px solid var(--border)",flexShrink:0}}',
@@ -519,8 +244,8 @@ content = content.replace(
 patchCount++;
 console.log('[add-mobile-responsive] PATCH D: Job tabs smooth scroll');
 
-// PATCH E: Inline grids with large minmax values — reduce for mobile
-// Fix gridTemplateColumns with minmax(340px,...) — way too wide for mobile
+// PATCH E: Inline grids with large minmax values â reduce for mobile
+// Fix gridTemplateColumns with minmax(340px,...) â way too wide for mobile
 content = content.replace(
   /gridTemplateColumns:"repeat\(auto-fill,minmax\(340px,1fr\)\)"/g,
   'gridTemplateColumns:"repeat(auto-fill,minmax(min(340px,100%),1fr))"'
@@ -570,7 +295,7 @@ content = content.replace(
 patchCount++;
 console.log('[add-mobile-responsive] PATCH E: Fixed all grid minmax for mobile');
 
-// PATCH F: Tables — wrap in scrollable container for mobile
+// PATCH F: Tables â wrap in scrollable container for mobile
 // Most tables already have tbl-wrap or overflowX:auto parents
 // But some raw <table> in the code don't. Let's add overflow to key table wrappers.
 // The invoice items table in job detail
@@ -587,8 +312,8 @@ patchCount++;
 console.log('[add-mobile-responsive] PATCH F: Added touch scrolling to table wrappers');
 
 // PATCH G: Fixed-width elements that cause overflow
-// width:560px in camera estimate / invoice fullscreen — use max-width instead
-// There are divs with width:"min(560px,90vw)" — already good
+// width:560px in camera estimate / invoice fullscreen â use max-width instead
+// There are divs with width:"min(560px,90vw)" â already good
 // Fix any width:480 or similar fixed widths
 content = content.replace(
   /maxWidth:480,/g,
@@ -597,9 +322,9 @@ content = content.replace(
 patchCount++;
 console.log('[add-mobile-responsive] PATCH G: Fixed maxWidth:480 overflow');
 
-// PATCH H: Command palette width — already uses min(560px,90vw) — good
+// PATCH H: Command palette width â already uses min(560px,90vw) â good
 
-// PATCH I: Dashboard hero action badges — the top right badges row
+// PATCH I: Dashboard hero action badges â the top right badges row
 // These use minWidth:76 which is fine but the parent flex needs wrapping
 // Let's find the badge container in the dashboard hero
 const heroBadgeRow = 'style={{display:"flex",gap:10,alignItems:"center"}}>';
@@ -607,7 +332,7 @@ if (content.includes(heroBadgeRow)) {
   // Already wraps fine due to flex behavior
 }
 
-// PATCH J: Viewport meta — make sure we prevent zoom on inputs (already has width=device-width)
+// PATCH J: Viewport meta â make sure we prevent zoom on inputs (already has width=device-width)
 // Add maximum-scale and user-scalable meta to index.html if present
 try {
   const indexHtml = 'index.html';
@@ -627,14 +352,14 @@ try {
 // PATCH K: Ensure all overflowX: "auto" containers have smooth scrolling
 // Already handled in CSS
 
-// PATCH L: Fix the CRM board on mobile — inline style override
+// PATCH L: Fix the CRM board on mobile â inline style override
 content = content.replace(
   /className="crm-board"/g,
   'className="crm-board" '
 );
 
 // PATCH M: Grid template fixed columns that break on mobile
-// "gridTemplateColumns: "1fr 1fr"" — these are fine since CSS handles .g2
+// "gridTemplateColumns: "1fr 1fr"" â these are fine since CSS handles .g2
 // But specific inline ones like: gridTemplateColumns:"3fr 2fr"
 content = content.replace(
   /gridTemplateColumns:"3fr 2fr"/g,
@@ -643,7 +368,7 @@ content = content.replace(
 patchCount++;
 
 // PATCH N: Fix inline max-heights that are too tall for mobile
-// "maxHeight: 380" etc — change to use min() with vh
+// "maxHeight: 380" etc â change to use min() with vh
 content = content.replace(
   /maxHeight:380,/g,
   'maxHeight:"min(380px,60vh)",'
@@ -663,7 +388,7 @@ content = content.replace(
 patchCount++;
 console.log('[add-mobile-responsive] PATCH O: Dropdown width responsive');
 
-// PATCH P: Calendar grid needs special mobile handling — already in CSS
+// PATCH P: Calendar grid needs special mobile handling â already in CSS
 
 // PATCH Q: Ensure equipment checklist is mobile-friendly
 // The equipment module already uses maxWidth:540 which is fine with margin:"0 auto"
@@ -674,7 +399,7 @@ content = content.replace(
   'className="detail-body">',
   'className="detail-body" style={{overflowX:"hidden"}}>'
 );
-// Be more careful — there might be detail-body with existing styles
+// Be more careful â there might be detail-body with existing styles
 // Actually that would break ones that already have style. Let me be more targeted.
 // Revert the above and instead handle via CSS which we already did.
 content = content.replace(
@@ -684,5 +409,5 @@ content = content.replace(
 
 // Write the patched JSX
 writeFileSync(file, content);
-console.log('[add-mobile-responsive] ✅ All patches applied (' + patchCount + ' patches to JSX, mobile CSS injected)');
-console.log('[add-mobile-responsive] Original JSX: ' + original.length + ' chars → Patched: ' + content.length + ' chars');
+console.log('[add-mobile-responsive] â All patches applied (' + patchCount + ' patches to JSX, mobile CSS injected)');
+console.log('[add-mobile-responsive] Original JSX: ' + original.length + ' chars â Patched: ' + content.length + ' chars');
