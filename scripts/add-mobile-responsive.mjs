@@ -180,101 +180,7 @@ const mobileCss = `
     gap: 8px;
   }
 
-  /* ── Client detail tabs: scrollable ──────────── */
-  .ctab-row {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 3px;
-    gap: 1px;
-  }
-  .ctab-row::-webkit-scrollbar { display: none; }
-  .ctab {
-    padding: 0 10px;
-    height: 34px;
-    font-size: 10px;
-    flex-shrink: 0;
-  }
-
-  /* ── Client hero ────────────────────────────── */
-  .client-hero {
-    padding: 14px 16px;
-  }
-  .client-hero-name {
-    font-size: 19px;
-  }
-
-  /* ── Client rows ────────────────────────────── */
-  .client-row {
-    padding: 11px 14px;
-    gap: 10px;
-    min-height: 60px;
-  }
-
-  /* ── Client quick actions ──────────────────── */
-  .client-qa {
-    padding: 10px 14px;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .client-qa-btn {
-    min-width: 0;
-    flex: 1 1 calc(50% - 4px);
-    height: 44px;
-    font-size: 12px;
-    gap: 5px;
-    border-radius: 10px;
-  }
-
-  /* ── Info rows ────────────────────────────── */
-  .info-row {
-    gap: 8px;
-  }
-  .info-val {
-    font-size: 13px;
-    word-break: break-word;
-  }
-
-  /* ── Job card list ──────────────────────────── */
-  .job-card {
-    padding: 10px;
-  }
-
-  /* ── Job map ─────────────────────────────── */
-  .job-map {
-    height: 160px;
-  }
-  .job-map-addr {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    padding: 6px 10px;
-    gap: 6px;
-  }
-  .job-map-addr span {
-    font-size: 11px !important;
-  }
-
-  /* ── Mobile list items ───────────────────────── */
-  .mobile-list-item {
-    padding: 12px 14px;
-    gap: 10px;
-    min-height: 64px;
-  }
-  .mli-name { font-size: 13px; }
-  .mli-amt { font-size: 16px; }
-
-  /* ── Bottom nav: ensure safe area ──────────────── */
-  .bottom-nav {
-    padding: 4px 0 max(env(safe-area-inset-bottom, 4px), 4px);
-  }
-  .bn-item {
-    min-height: 48px;
-    font-size: 8px;
-    padding: 4px 2px;
-  }
-  .bn-item-icon { font-size: 18px; }
-────── */
+  /* ── Client detail tabs: scrollable ──────────────── */
   .ctab-row {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -611,9 +517,8 @@ content = content.replace(
 patchCount++;
 
 content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(280px,1fr\)\)"/g,
+  /gridTemplateColumns:'repeat\(auto-fill,minmax\(280px,1fr\)\)"/g,
   'gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))"'
-)'
 );
 patchCount++;
 
@@ -630,7 +535,7 @@ content = content.replace(
 patchCount++;
 
 content = content.replace(
-  /gridTemplateColumns:"repeat\(auto-fill,minmax\(190px,1fr\)\)"/g,
+  /gridTemplateColumns:'repeat\(auto-fill,minmax\(190px,1fr\)\)"/g,
   'gridTemplateColumns:"repeat(auto-fill,minmax(min(190px,100%),1fr))"'
 );
 patchCount++;
