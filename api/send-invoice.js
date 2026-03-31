@@ -1,168 +1,300 @@
-// /api/send-invoice.js - Vercel serverless function
-// Generates a PDF invoice and sends it via Gmail using nodemailer
-import nodemailer from 'nodemailer';
+// api/send-invoice.js â PDF invoice generation + Gmail sending + Cloudinary upload
+// Vercel serverless function
+// Generates a professional PDF invoice, uploads it to Cloudinary (ServicePro/invoices),
+// emails it via Gmail SMTP, and returns the Cloudinary URL for IndexedDB storage.
+
 import PDFDocument from 'pdfkit';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+import https from 'https';
 
-export const config = { maxDuration: 30 };
-
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  try {
-    const { to, clientName, invoiceNumber, invoiceDate, dueDate, items, subtotal, tax, total, notes, companyName, companyPhone, status } = req.body;
-    if (!to || !invoiceNumber || !items || !items.length) {
-      return res.status(400).json({ error: 'Missing required fields: to, invoiceNumber, items' });
-    }
-    const company = companyName || 'ServicePro by TurfCure';
-    const phone = companyPhone || '713-470-92-70';
-    const fromEmail = process.env.GMAIL_USER || 'turfcure@gmail.com';
-
-    const pdfBuffer = await generateInvoicePDF({ company, phone, fromEmail, clientName, invoiceNumber, invoiceDate, dueDate, items, subtotal, tax, total, notes, status });
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD }
-    });
-
-    const htmlBody = buildEmailHTML({ company, clientName, invoiceNumber, invoiceDate, dueDate, total, status });
-
-    const info = await transporter.sendMail({
-      from: '"' + company + '" <' + fromEmail + '>',
-      to,
-      subject: company + ' - Invoice ' + invoiceNumber,
-      html: htmlBody,
-      attachments: [{ filename: invoiceNumber + '.pdf', content: pdfBuffer, contentType: 'application/pdf' }]
-    });
-
-    return res.status(200).json({ ok: true, messageId: info.messageId, to, invoiceNumber });
-  } catch (err) {
-    console.error('send-invoice error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to send invoice' });
-  }
-                                                          }
-
-function generateInvoicePDF({ company, phone, fromEmail, clientName, invoiceNumber, invoiceDate, dueDate, items, subtotal, tax, total, notes, status }) {
+// ââ Cloudinary upload helper ââââââââââââââââââââââââââââââââââââââââââ
+function uploadToCloudinary(pdfBuffer, publicId) {
   return new Promise((resolve, reject) => {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      console.warn('[send-invoice] Cloudinary env vars missing, skipping upload');
+      return resolve(null);
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = 'ServicePro/invoices';
+    const paramsToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}`;
+    const signature = crypto
+      .createHash('sha1')
+      .update(paramsToSign + apiSecret)
+      .digest('hex');
+
+    const boundary = '----CloudinaryBoundary' + Date.now();
+    const fields = {
+      file: null, // handled separately
+      api_key: apiKey,
+      timestamp: String(timestamp),
+      signature: signature,
+      folder: folder,
+      public_id: publicId,
+      resource_type: 'raw',
+    };
+
+    // Build multipart body
+    let bodyParts = [];
+    for (const [key, val] of Object.entries(fields)) {
+      if (key === 'file' || val === null) continue;
+      bodyParts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${val}\r\n`
+      );
+    }
+    // Add file part
+    const fileHeader = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${publicId}.pdf"\r\nContent-Type: application/pdf\r\n\r\n`;
+    const fileFooter = `\r\n--${boundary}--\r\n`;
+
+    const headerBuf = Buffer.from(fileHeader, 'utf8');
+    const footerBuf = Buffer.from(fileFooter, 'utf8');
+    const fieldsBuf = Buffer.from(bodyParts.join(''), 'utf8');
+    const fullBody = Buffer.concat([fieldsBuf, headerBuf, pdfBuffer, footerBuf]);
+
+    const options = {
+      hostname: 'api.cloudinary.com',
+      path: `/v1_1/${cloudName}/raw/upload`,
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': fullBody.length,
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.secure_url) {
+            resolve({
+              url: json.secure_url,
+              public_id: json.public_id,
+              asset_id: json.asset_id,
+              folder: json.folder,
+              bytes: json.bytes,
+            });
+          } else {
+            console.error('[send-invoice] Cloudinary response:', data);
+            resolve(null);
+          }
+        } catch (e) {
+          console.error('[send-invoice] Cloudinary parse error:', e.message);
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', (e) => {
+      console.error('[send-invoice] Cloudinary upload error:', e.message);
+      resolve(null);
+    });
+    req.write(fullBody);
+    req.end();
+  });
+}
+
+// ââ PDF generation ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function generateInvoicePDF(data) {
+  return new Promise((resolve) => {
     const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
     const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
 
     const green = '#2E7D32';
-    const darkGray = '#333333';
-    const lightGray = '#F5F5F5';
-    const medGray = '#888888';
+    const {
+      clientName, invoiceNumber, invoiceDate, dueDate,
+      items = [], subtotal = 0, tax = 0, total = 0,
+      notes, companyName = 'ServicePro by TurfCure',
+      companyPhone = '', companyEmail = '', status = 'pending'
+    } = data;
 
     // Header
-    doc.rect(0, 0, doc.page.width, 100).fill(green);
-    doc.fill('#FFFFFF').fontSize(24).font('Helvetica-Bold').text(company, 50, 30);
-    doc.fontSize(10).font('Helvetica').text(phone + '  |  ' + fromEmail, 50, 60);
+    doc.rect(0, 0, 612, 100).fill(green);
+    doc.fill('#fff').fontSize(28).font('Helvetica-Bold')
+      .text(companyName, 50, 30);
+    doc.fontSize(12).font('Helvetica')
+      .text('INVOICE', 50, 65);
+    if (companyPhone) doc.text(companyPhone, 400, 35, { align: 'right' });
+    if (companyEmail) doc.text(companyEmail, 400, 52, { align: 'right' });
 
-    // Invoice Title + Status
-    doc.fill(darkGray).fontSize(28).font('Helvetica-Bold').text('INVOICE', 50, 120);
-    if (status) {
-      var sc = status === 'Paid' ? green : '#F57C00';
-      doc.fill(sc).fontSize(14).font('Helvetica-Bold').text(status.toUpperCase(), 400, 128, { align: 'right' });
-    }
+    // Invoice details
+    doc.fill('#333').fontSize(11).font('Helvetica');
+    const detailY = 120;
+    doc.font('Helvetica-Bold').text('Invoice Number:', 50, detailY);
+    doc.font('Helvetica').text(invoiceNumber || 'N/A', 170, detailY);
+    doc.font('Helvetica-Bold').text('Date:', 50, detailY + 18);
+    doc.font('Helvetica').text(invoiceDate || new Date().toLocaleDateString(), 170, detailY + 18);
+    doc.font('Helvetica-Bold').text('Due Date:', 50, detailY + 36);
+    doc.font('Helvetica').text(dueDate || 'Upon receipt', 170, detailY + 36);
+    doc.font('Helvetica-Bold').text('Status:', 50, detailY + 54);
+    doc.font('Helvetica').text(status.toUpperCase(), 170, detailY + 54);
 
-    // Invoice Info
-    var iy = 165;
-    doc.fill(medGray).fontSize(9).font('Helvetica');
-    doc.text('Invoice Number', 50, iy);
-    doc.text('Invoice Date', 200, iy);
-    doc.text('Due Date', 350, iy);
-    doc.fill(darkGray).fontSize(11).font('Helvetica-Bold');
-    doc.text(invoiceNumber, 50, iy + 14);
-    doc.text(invoiceDate || '-', 200, iy + 14);
-    doc.text(dueDate || '-', 350, iy + 14);
+    // Bill to
+    doc.font('Helvetica-Bold').text('Bill To:', 350, detailY);
+    doc.font('Helvetica').text(clientName || 'N/A', 350, detailY + 18);
 
-    // Bill To
-    var by2 = iy + 50;
-    doc.fill(medGray).fontSize(9).font('Helvetica').text('Bill To', 50, by2);
-    doc.fill(darkGray).fontSize(12).font('Helvetica-Bold').text(clientName || 'Client', 50, by2 + 14);
+    // Items table
+    const tableTop = detailY + 90;
+    doc.rect(50, tableTop, 512, 22).fill(green);
+    doc.fill('#fff').fontSize(10).font('Helvetica-Bold');
+    doc.text('Description', 55, tableTop + 6);
+    doc.text('Qty', 340, tableTop + 6, { width: 50, align: 'center' });
+    doc.text('Unit Price', 395, tableTop + 6, { width: 70, align: 'right' });
+    doc.text('Amount', 475, tableTop + 6, { width: 80, align: 'right' });
 
-    // Items Table
-    var tt = by2 + 55;
-    doc.rect(50, tt, doc.page.width - 100, 24).fill(green);
-    doc.fill('#FFFFFF').fontSize(9).font('Helvetica-Bold');
-    doc.text('DESCRIPTION', 60, tt + 7);
-    doc.text('QTY', 340, tt + 7, { width: 50, align: 'center' });
-    doc.text('UNIT PRICE', 395, tt + 7, { width: 70, align: 'right' });
-    doc.text('AMOUNT', 475, tt + 7, { width: 70, align: 'right' });
-
-    var ry = tt + 28;
-    (items || []).forEach(function(item, idx) {
-      var bg = idx % 2 === 0 ? '#FFFFFF' : lightGray;
-      doc.rect(50, ry - 4, doc.page.width - 100, 22).fill(bg);
-      var qty = item.qty || item.quantity || 1;
-      var price = item.unitPrice || item.price || 0;
-      var amount = qty * price;
-      doc.fill(darkGray).fontSize(10).font('Helvetica');
-      doc.text(item.description || item.name || '-', 60, ry);
-      doc.text(String(qty), 340, ry, { width: 50, align: 'center' });
-      doc.text('$' + price.toFixed(2), 395, ry, { width: 70, align: 'right' });
-      doc.text('$' + amount.toFixed(2), 475, ry, { width: 70, align: 'right' });
-      ry += 22;
+    let y = tableTop + 26;
+    doc.fill('#333').font('Helvetica').fontSize(10);
+    (items || []).forEach((item, i) => {
+      const bg = i % 2 === 0 ? '#f9f9f9' : '#fff';
+      doc.rect(50, y - 2, 512, 20).fill(bg);
+      doc.fill('#333');
+      doc.text(item.description || '', 55, y + 2, { width: 280 });
+      doc.text(String(item.qty || 1), 340, y + 2, { width: 50, align: 'center' });
+      doc.text('$' + (item.unitPrice || 0).toFixed(2), 395, y + 2, { width: 70, align: 'right' });
+      const amt = (item.qty || 1) * (item.unitPrice || 0);
+      doc.text('$' + amt.toFixed(2), 475, y + 2, { width: 80, align: 'right' });
+      y += 20;
     });
 
     // Totals
-    var tly = ry + 20;
-    doc.moveTo(380, tly).lineTo(545, tly).stroke('#DDDDDD');
-    doc.fill(medGray).fontSize(10).font('Helvetica').text('Subtotal', 380, tly + 8);
-    doc.fill(darkGray).font('Helvetica-Bold').text('$' + (subtotal || 0).toFixed(2), 475, tly + 8, { width: 70, align: 'right' });
-    doc.fill(medGray).font('Helvetica').text('Tax', 380, tly + 28);
-    doc.fill(darkGray).font('Helvetica-Bold').text('$' + (tax || 0).toFixed(2), 475, tly + 28, { width: 70, align: 'right' });
-    doc.moveTo(380, tly + 48).lineTo(545, tly + 48).stroke('#DDDDDD');
-    doc.fill(green).fontSize(14).font('Helvetica-Bold').text('Total', 380, tly + 56);
-    doc.text('$' + (total || 0).toFixed(2), 475, tly + 56, { width: 70, align: 'right' });
+    y += 10;
+    doc.moveTo(350, y).lineTo(562, y).stroke('#ccc');
+    y += 8;
+    doc.font('Helvetica').text('Subtotal:', 400, y);
+    doc.text('$' + Number(subtotal).toFixed(2), 475, y, { width: 80, align: 'right' });
+    y += 18;
+    doc.text('Tax:', 400, y);
+    doc.text('$' + Number(tax).toFixed(2), 475, y, { width: 80, align: 'right' });
+    y += 18;
+    doc.moveTo(400, y).lineTo(562, y).stroke('#ccc');
+    y += 6;
+    doc.font('Helvetica-Bold').fontSize(14).fill(green);
+    doc.text('Total:', 400, y);
+    doc.text('$' + Number(total).toFixed(2), 460, y, { width: 95, align: 'right' });
 
+    // Notes
     if (notes) {
-      var ny = tly + 100;
-      doc.fill(medGray).fontSize(9).font('Helvetica').text('Notes', 50, ny);
-      doc.fill(darkGray).fontSize(10).font('Helvetica').text(notes, 50, ny + 14, { width: 300 });
+      y += 40;
+      doc.fill('#333').fontSize(10).font('Helvetica-Bold').text('Notes:', 50, y);
+      doc.font('Helvetica').text(notes, 50, y + 16, { width: 400 });
     }
 
-    var fy = doc.page.height - 50;
-    doc.fill(medGray).fontSize(8).font('Helvetica')
-      .text(company + '  *  ' + phone + '  *  ' + fromEmail, 50, fy, { align: 'center', width: doc.page.width - 100 });
-    doc.text('Thank you for your business!', 50, fy + 12, { align: 'center', width: doc.page.width - 100 });
+    // Footer
+    doc.fill('#999').fontSize(8).font('Helvetica');
+    doc.text('Generated by ServicePro by TurfCure', 50, 720, { align: 'center', width: 512 });
 
     doc.end();
   });
-                                                                 }
+}
 
-function buildEmailHTML({ company, clientName, invoiceNumber, invoiceDate, dueDate, total, status }) {
-  var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>';
-  h += '<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">';
-  h += '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;"><tr><td align="center">';
-  h += '<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">';
-  // Header
-  h += '<tr><td style="background:#2E7D32;padding:28px 32px;"><h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">' + company + '</h1></td></tr>';
-  // Body
-  h += '<tr><td style="padding:32px;">';
-  h += '<p style="margin:0 0 16px;color:#333;font-size:16px;">Hi <strong>' + (clientName || 'there') + '</strong>,</p>';
-  h += '<p style="margin:0 0 24px;color:#555;font-size:14px;line-height:1.6;">Please find attached your invoice <strong>' + invoiceNumber + '</strong>.';
-  if (dueDate) h += ' Payment is due by <strong>' + dueDate + '</strong>.';
-  h += '</p>';
-  // Invoice summary card
-  h += '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;">';
-  h += '<tr><td style="padding:20px;"><table width="100%" cellpadding="0" cellspacing="0">';
-  h += '<tr><td style="color:#888;font-size:12px;text-transform:uppercase;">Invoice</td>';
-  h += '<td style="color:#888;font-size:12px;text-transform:uppercase;" align="right">Amount Due</td></tr>';
-  h += '<tr><td style="color:#333;font-size:18px;font-weight:700;padding-top:4px;">' + invoiceNumber + '</td>';
-  h += '<td style="color:#2E7D32;font-size:24px;font-weight:700;padding-top:4px;" align="right">$' + (total || 0).toFixed(2) + '</td></tr>';
-  h += '<tr><td style="color:#888;font-size:12px;padding-top:8px;">Date: ' + (invoiceDate || '-') + '</td>';
-  h += '<td style="color:#888;font-size:12px;padding-top:8px;" align="right">' + (status ? 'Status: <strong>' + status + '</strong>' : '') + '</td></tr>';
-  h += '</table></td></tr></table>';
-  h += '<p style="margin:24px 0 0;color:#555;font-size:13px;line-height:1.5;">The PDF invoice is attached to this email. If you have any questions, feel free to reply.</p>';
-  h += '</td></tr>';
-  // Footer
-  h += '<tr><td style="background:#fafafa;padding:20px 32px;border-top:1px solid #eee;"><p style="margin:0;color:#999;font-size:12px;text-align:center;">' + company + ' - Thank you for your business!</p></td></tr>';
-  h += '</table></td></tr></table></body></html>';
-  return h;
+// ââ Main handler ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  try {
+    const {
+      to, clientName, invoiceNumber, invoiceDate, dueDate,
+      items, subtotal, tax, total, notes,
+      companyName, companyPhone, companyEmail, status,
+      jobId
+    } = req.body;
+
+    if (!to || !invoiceNumber) {
+      return res.status(400).json({ error: 'Missing required fields: to, invoiceNumber' });
+    }
+
+    // 1. Generate PDF
+    const pdfBuffer = await generateInvoicePDF(req.body);
+
+    // 2. Upload to Cloudinary (non-blocking â we don't fail if it errors)
+    const cloudinaryPublicId = `invoice_${invoiceNumber}_${Date.now()}`;
+    const cloudinaryResult = await uploadToCloudinary(pdfBuffer, cloudinaryPublicId);
+
+    if (cloudinaryResult) {
+      console.log('[send-invoice] Uploaded to Cloudinary:', cloudinaryResult.url);
+    }
+
+    // 3. Send email via Gmail SMTP
+    const user = process.env.GMAIL_USER;
+    const pass = process.env.GMAIL_APP_PASSWORD;
+
+    let emailResult = null;
+    if (user && pass) {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+      });
+
+      const company = companyName || 'ServicePro by TurfCure';
+      const htmlBody = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#2E7D32;padding:24px;border-radius:8px 8px 0 0;">
+            <h1 style="color:#fff;margin:0;font-size:22px;">${company}</h1>
+            <p style="color:#c8e6c9;margin:4px 0 0;font-size:13px;">Invoice #${invoiceNumber}</p>
+          </div>
+          <div style="padding:24px;background:#f9f9f9;border:1px solid #e0e0e0;">
+            <p>Dear ${clientName || 'Customer'},</p>
+            <p>Please find your invoice attached. Here's a summary:</p>
+            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin:16px 0;">
+              <table style="width:100%;font-size:14px;">
+                <tr><td style="padding:4px 0;color:#666;">Invoice #</td><td style="text-align:right;font-weight:bold;">${invoiceNumber}</td></tr>
+                <tr><td style="padding:4px 0;color:#666;">Date</td><td style="text-align:right;">${invoiceDate || 'N/A'}</td></tr>
+                <tr><td style="padding:4px 0;color:#666;">Due Date</td><td style="text-align:right;">${dueDate || 'Upon receipt'}</td></tr>
+                <tr><td style="padding:4px 0;border-top:1px solid #eee;font-weight:bold;color:#2E7D32;">Total</td>
+                    <td style="text-align:right;border-top:1px solid #eee;font-weight:bold;font-size:18px;color:#2E7D32;">$${Number(total || 0).toFixed(2)}</td></tr>
+              </table>
+            </div>
+            ${cloudinaryResult ? `<p style="font-size:12px;color:#666;">You can also <a href="${cloudinaryResult.url}">view this invoice online</a>.</p>` : ''}
+            <p style="color:#666;font-size:12px;">Thank you for your business!</p>
+          </div>
+        </div>
+      `;
+
+      const info = await transporter.sendMail({
+        from: `"${company}" <${user}>`,
+        to,
+        subject: `Invoice #${invoiceNumber} from ${company}`,
+        html: htmlBody,
+        attachments: [{
+          filename: `Invoice-${invoiceNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        }],
+      });
+
+      emailResult = { messageId: info.messageId, to };
+    }
+
+    // 4. Return result with Cloudinary URL for client-side IndexedDB storage
+    return res.status(200).json({
+      ok: true,
+      invoiceNumber,
+      to,
+      messageId: emailResult?.messageId || null,
+      cloudinary: cloudinaryResult || null,
+      jobId: jobId || null,
+    });
+
+  } catch (err) {
+    console.error('[send-invoice] Error:', err);
+    return res.status(500).json({ error: err.message });
+  }
 }
