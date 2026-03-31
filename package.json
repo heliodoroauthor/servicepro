@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "nodemailer": "^6.9.0",
+    "pdfkit": "^0.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -18,4 +20,3 @@
     "vite": "^6.0.0"
   }
 }
-
