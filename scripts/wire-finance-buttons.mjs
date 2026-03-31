@@ -166,7 +166,7 @@ const estContent = `s.key==="est" ? (
 ) : savedEstimates.map(function(est, idx) { return (
 <div key={idx} style={{background:"#f5f7fa",border:"1px solid #e0e0e0",borderRadius:8,padding:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div><div style={{fontWeight:"bold",fontSize:14}}>{est.number}</div>
-<div style={{color:"#666",fontSize:12}}>{est.date} - ${est.to || "No email"}</div></div>
+<div style={{color:"#666",fontSize:12}}>{est.date} - \${est.to || "No email"}</div></div>
 <div style={{display:"flex",gap:8,alignItems:"center"}}>
 <span style={{fontWeight:"bold",color:"#1565C0"}}>${"$"}{est.total ? est.total.toFixed(2) : "0.00"}</span>
 {est.emailed && <span style={{background:"#c8e6c9",color:"#2E7D32",padding:"2px 8px",borderRadius:12,fontSize:11}}>Emailed</span>}
@@ -183,7 +183,7 @@ const invContent = `s.key==="inv" ? (
 ) : savedInvoices.map(function(inv, idx) { return (
 <div key={idx} style={{background:"#f5f7fa",border:"1px solid #e0e0e0",borderRadius:8,padding:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div><div style={{fontWeight:"bold",fontSize:14}}>{inv.number}</div>
-<div style={{color:"#666",fontSize:12}}>{inv.date} - ${inv.to || "No email"}</div></div>
+<div style={{color:"#666",fontSize:12}}>{inv.date} - \${inv.to || "No email"}</div></div>
 <div style={{display:"flex",gap:8,alignItems:"center"}}>
 <span style={{fontWeight:"bold",color:"#2E7D32"}}>${"$"}{inv.total ? inv.total.toFixed(2) : "0.00"}</span>
 {inv.emailed && <span style={{background:"#c8e6c9",color:"#2E7D32",padding:"2px 8px",borderRadius:12,fontSize:11}}>Emailed</span>}
