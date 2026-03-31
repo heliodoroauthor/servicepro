@@ -145,11 +145,12 @@ if (createInvBtnIdx === -1) {
   process.exit(1);
 }
 // Find the button opening tag before it (walk backwards, max 500 chars)
+// NOTE: The app uses <Btn> custom component, not <button>
 let btnStart = createInvBtnIdx;
 const btnSearchLimit = Math.max(0, createInvBtnIdx - 500);
-while (btnStart > btnSearchLimit && c.substring(btnStart, btnStart + 7) !== '<button') btnStart--;
-if (c.substring(btnStart, btnStart + 7) !== '<button') {
-  console.error('[wire-finance-buttons] Cannot find <button before Create Invoice');
+while (btnStart > btnSearchLimit && c.substring(btnStart, btnStart + 4) !== '<Btn') btnStart--;
+if (c.substring(btnStart, btnStart + 4) !== '<Btn') {
+  console.error('[wire-finance-buttons] Cannot find <Btn before Create Invoice');
   process.exit(1);
 }
 // Find the onClick in this button (between btnStart and createInvBtnIdx)
@@ -182,9 +183,9 @@ if (sendEstBtnIdx === -1) {
 }
 let btnStart2 = sendEstBtnIdx;
 const btnSearchLimit2 = Math.max(0, sendEstBtnIdx - 500);
-while (btnStart2 > btnSearchLimit2 && c.substring(btnStart2, btnStart2 + 7) !== '<button') btnStart2--;
-if (c.substring(btnStart2, btnStart2 + 7) !== '<button') {
-  console.error('[wire-finance-buttons] Cannot find <button before Send Estimate');
+while (btnStart2 > btnSearchLimit2 && c.substring(btnStart2, btnStart2 + 4) !== '<Btn') btnStart2--;
+if (c.substring(btnStart2, btnStart2 + 4) !== '<Btn') {
+  console.error('[wire-finance-buttons] Cannot find <Btn before Send Estimate');
   process.exit(1);
 }
 const onClickStart2 = c.indexOf('onClick', btnStart2);
@@ -274,14 +275,16 @@ console.log('[wire-finance-buttons] STEP 5: Added vertical column layout for Est
 // Find the Create Invoice button again (after STEP 3 rewired it) and add disabled prop
 // We search for our NEW onClick text to identify the correct buttons
 // ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// NOTE: The app uses <Btn> custom component, not <button>
+// Insert disabled prop right after the onClick we just replaced
 const ciMarker = 'sendInvoiceToAPI(jd,em)';
 const ciBtn2 = c.indexOf(ciMarker);
 if (ciBtn2 !== -1) {
   let bs = ciBtn2;
-  while (bs > 0 && c.substring(bs, bs + 7) !== '<button') bs--;
-  const styleIdx = c.indexOf('style=', bs);
-  if (styleIdx !== -1 && styleIdx < ciBtn2) {
-    c = c.substring(0, styleIdx) + 'disabled={financeLoading==="invoice"} ' + c.substring(styleIdx);
+  while (bs > 0 && c.substring(bs, bs + 4) !== '<Btn') bs--;
+  if (c.substring(bs, bs + 4) === '<Btn') {
+    // Insert disabled prop after "<Btn "
+    c = c.substring(0, bs + 4) + ' disabled={financeLoading==="invoice"}' + c.substring(bs + 4);
   }
 }
 
@@ -289,10 +292,9 @@ const seMarker = 'sendEstimateToAPI(jd,em)';
 const seBtn2 = c.indexOf(seMarker);
 if (seBtn2 !== -1) {
   let bs2 = seBtn2;
-  while (bs2 > 0 && c.substring(bs2, bs2 + 7) !== '<button') bs2--;
-  const styleIdx2 = c.indexOf('style=', bs2);
-  if (styleIdx2 !== -1 && styleIdx2 < seBtn2) {
-    c = c.substring(0, styleIdx2) + 'disabled={financeLoading==="estimate"} ' + c.substring(styleIdx2);
+  while (bs2 > 0 && c.substring(bs2, bs2 + 4) !== '<Btn') bs2--;
+  if (c.substring(bs2, bs2 + 4) === '<Btn') {
+    c = c.substring(0, bs2 + 4) + ' disabled={financeLoading==="estimate"}' + c.substring(bs2 + 4);
   }
 }
 console.log('[wire-finance-buttons] STEP 6: Added loading/disabled states to buttons');
