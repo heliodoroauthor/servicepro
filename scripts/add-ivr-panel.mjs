@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-// ââ add-ivr-panel.mjs ââ
-// Injects IvrPanel into ServiceProApp.jsx during Vercel prebuild.
-// Placement: on the Finance tab, AFTER AiBundlePanel and BEFORE TieredOptions.
+// Injects IvrPanel into the SETTINGS page of ServiceProApp.jsx during Vercel prebuild.
+// Placement: as a new "IVR" tab in the Settings page STABS array,
+// with the panel JSX rendered when the IVR tab is selected.
 
 const file = 'src/ServiceProApp.jsx';
 let c = readFileSync(file, 'utf8');
@@ -12,7 +12,7 @@ if (c.includes('IvrPanel')) {
   process.exit(0);
 }
 
-// ââ Step 1: Add import after the React import line ââ
+// STEP 1: Add import after the React import line
 const importAnchor = 'from "react";';
 const importIdx = c.indexOf(importAnchor);
 if (importIdx === -1) {
@@ -21,48 +21,67 @@ if (importIdx === -1) {
 }
 const importEnd = importIdx + importAnchor.length;
 c = c.substring(0, importEnd) + '\nimport IvrPanel from "./IvrPanel";' + c.substring(importEnd);
-console.log('[add-ivr-panel] Step 1: Added IvrPanel import.');
+console.log('[add-ivr-panel] STEP 1: Added IvrPanel import');
 
-// ââ Step 2: Insert <IvrPanel/> into the Finance tab ââ
-// Try placing AFTER AiBundlePanel (if it exists) and BEFORE TieredOptions.
-// Fallback: before EXPANDABLE SECTIONS comment.
-const anchors = [
-  { text: '<TieredOptions ', before: true },
-  { text: '{/* -- EXPANDABLE SECTIONS -- */}', before: true },
-];
+// STEP 2: Add "IVR" tab to the STABS array in Settings page
+const escalationTab = 'id:"escalation"';
+const syncTab = 'id:"sync"';
 
-let inserted = false;
+let tabAnchor = null;
+let tabAnchorIdx = -1;
 
-// If AiBundlePanel component tag exists, insert right AFTER its closing />
-const aiBundleTag = '<AiBundlePanel ';
-const aiBundleIdx = c.indexOf(aiBundleTag);
-if (aiBundleIdx !== -1) {
-  // Find the end of the self-closing tag "/>"\n
-  const closeIdx = c.indexOf('/>', aiBundleIdx);
-  if (closeIdx !== -1) {
-    const insertAt = closeIdx + 2; // after "/>"
-    c = c.substring(0, insertAt) + '\n<IvrPanel/>' + c.substring(insertAt);
-    inserted = true;
-    console.log('[add-ivr-panel] Step 2: Inserted IvrPanel after AiBundlePanel.');
-  }
+if (c.includes(escalationTab)) {
+  tabAnchorIdx = c.indexOf(escalationTab);
+  tabAnchor = 'escalation';
+} else {
+  tabAnchorIdx = c.indexOf(syncTab);
+  tabAnchor = 'sync';
 }
 
-if (!inserted) {
-  for (const anchor of anchors) {
-    const idx = c.indexOf(anchor.text);
-    if (idx !== -1) {
-      c = c.substring(0, idx) + '<IvrPanel/>\n' + c.substring(idx);
-      inserted = true;
-      console.log(`[add-ivr-panel] Step 2: Inserted IvrPanel before "${anchor.text.substring(0, 30)}...".`);
-      break;
-    }
+if (tabAnchorIdx !== -1) {
+  const closeBrace = c.indexOf('}', tabAnchorIdx);
+  if (closeBrace !== -1) {
+    const insertAt = closeBrace + 1;
+    const ivrTab = ',\n{id:"ivr", label:"IVR System", icon:"\uD83D\uDCDE"}';
+    c = c.substring(0, insertAt) + ivrTab + c.substring(insertAt);
+    console.log(`[add-ivr-panel] STEP 2: Added IVR tab to STABS (after ${tabAnchor})`);
   }
+} else {
+  console.log('[add-ivr-panel] WARNING: Could not find STABS tab anchor');
 }
 
-if (!inserted) {
-  console.log('[add-ivr-panel] Could not find insertion point. Skipping.');
-  process.exit(0);
+// STEP 3: Add IvrPanel JSX in the Settings page tab panels
+const syncComment = '{/* -- SYNC & OFFLINE -- */}';
+const syncCommentIdx = c.indexOf(syncComment);
+
+if (syncCommentIdx !== -1) {
+  const ivrPanel = `{/* -- IVR SYSTEM -- */}
+{stab === "ivr" && (
+<div style={{paddingTop:8}}>
+<IvrPanel/>
+</div>
+)}
+`;
+  c = c.substring(0, syncCommentIdx) + ivrPanel + c.substring(syncCommentIdx);
+  console.log('[add-ivr-panel] STEP 3: Added IvrPanel JSX in Settings tab panels');
+} else {
+  const escComment = '{/* -- ESCALATION -- */}';
+  const escIdx = c.indexOf(escComment);
+  if (escIdx !== -1) {
+    const ivrPanel = `{/* -- IVR SYSTEM -- */}
+{stab === "ivr" && (
+<div style={{paddingTop:8}}>
+<IvrPanel/>
+</div>
+)}
+`;
+    c = c.substring(0, escIdx) + ivrPanel + c.substring(escIdx);
+    console.log('[add-ivr-panel] STEP 3: Added IvrPanel JSX (before ESCALATION marker)');
+  } else {
+    console.error('[add-ivr-panel] ERROR: Could not find Settings page panel marker');
+    process.exit(1);
+  }
 }
 
 writeFileSync(file, c);
-console.log('[add-ivr-panel] Done! File written.');
+console.log('[add-ivr-panel] All IVR panel patches applied successfully!');
