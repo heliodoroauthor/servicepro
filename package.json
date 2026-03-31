@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/fix-duplicates.mjs && node scripts/add-csv-import.mjs && node scripts/add-twilio-sms.mjs && node scripts/add-click-to-call.mjs && node scripts/add-client-edit.mjs && node scripts/add-call-sms-ui.mjs && node scripts/add-jobs-call.mjs && node scripts/add-escalation-settings.mjs && node scripts/add-escalation-call.mjs && node scripts/add-equipment.mjs && node scripts/add-mobile-responsive.mjs && node scripts/add-tier-ui.mjs && node scripts/add-ai-bundle.mjs && node scripts/add-ivr-panel.mjs && node scripts/add-invoices-section.mjs",
+    "prebuild": "node scripts/fix-duplicates.mhjs && node scripts/add-csv-import.mjs && node scripts/add-twilio-sms.mjs && node scripts/add-click-to-call.mjs && node scripts/add-client-edit.mjs && node scripts/add-call-sms-ui.mjs && node scripts/add-jobs-call.mjs && node scripts/add-escalation-settings.mjs && node scripts/add-escalation-call.mjs && node scripts/add-equipment.mjs && node scripts/add-mobile-responsive.mjs && node scripts/add-tier-ui.mjs && node scripts/add-ai-bundle.mjs && node scripts/add-ivr-panel.mjs && node scripts/add-ainvoices-section.mjs && node scripts/wire-finance-buttons.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
