@@ -3,94 +3,89 @@ import { readFileSync, writeFileSync } from "fs";
 const FILE = "src/ServiceProApp.jsx";
 let c = readFileSync(FILE, "utf8");
 
-const MARKER = "/* SCHEDTAB_BUTTONS_V1 */";
-if (c.includes(MARKER)) { console.log("[schedtab-buttons] Already patched"); process.exit(0); }
+const MARKER = "/* SCHEDTAB_BUTTONS_V2 */";
+if (c.includes(MARKER)) { console.log("[schedtab-buttons] Already patched v2"); process.exit(0); }
+// Remove old marker
+c = c.replace("/* SCHEDTAB_BUTTONS_V1 */", "");
 
 // STEP 1: Replace button labels with icon+text
-const oldLabels = '[["calendar"," "],["recurring"," "],["ai","' + String.fromCharCode(10022) + ' AI"],["list","' + String.fromCharCode(9776) + '"]]';
-const newLabels = '[["calendar","' + String.fromCharCode(128197) + ' Calendar"],["recurring","' + String.fromCharCode(128260) + ' Recurring"],["ai","' + String.fromCharCode(10022) + ' AI Schedule"],["list","' + String.fromCharCode(128203) + ' All Appts"]]';
+const labelRe = /\[\["calendar","[^"]*"\],\s*\["recurring","[^"]*"\],\s*\["ai","[^"]*"\],\s*\["list","[^"]*"\]\]/;
+const m1 = c.match(labelRe);
+if (m1) {
+    const nl = '[["calendar","' + String.fromCharCode(128197) + ' Calendar"],["recurring","' + String.fromCharCode(128260) + ' Recurring"],["ai","' + String.fromCharCode(10022) + ' AI Schedule"],["list","' + String.fromCharCode(128203) + ' All Appts"]]';
+    c = c.replace(m1[0], nl);
+    console.log("[schedtab-buttons] STEP 1: Replaced labels");
+} else { console.warn("[schedtab-buttons] STEP 1: Labels not found"); }
 
-if (!c.includes(oldLabels)) {
-  const idx = c.indexOf('["calendar","');
-  if (idx === -1) { console.error("[schedtab-buttons] ABORT"); process.exit(1); }
-  const arrStart = c.lastIndexOf("[[", idx + 5);
-  const arrEnd = c.indexOf("]]", idx) + 2;
-  c = c.substring(0, arrStart) + newLabels + c.substring(arrEnd);
-} else { c = c.replace(oldLabels, newLabels); }
-console.log("[schedtab-buttons] Replaced labels");
+// STEP 2: Update button padding and font size
+c = c.replace(/padding:"7px 12px"/, 'padding:"10px 18px"');
+const fm = c.match(/fontSize:11\b([^0-9])/);
+if (fm) c = c.replace(/fontSize:11\b([^0-9])/, 'fontSize:13$1');
+console.log("[schedtab-buttons] STEP 2: Updated button styles");
 
-// STEP 2: Update inline styles - bigger padding, fontSize
-const si = c.indexOf("setSchedTab(id)");
-if (si !== -1) {
-  let area = c.substring(si, si + 500);
-  const p = area.indexOf('padding:"7px 12px"');
-  if (p !== -1) { const a = si + p; c = c.substring(0, a) + 'padding:"10px 18px"' + c.substring(a + 18); }
-  area = c.substring(si, si + 500);
-  const f = area.indexOf("fontSize:11");
-  if (f !== -1) { const a = si + f; c = c.substring(0, a) + "fontSize:13" + c.substring(a + 11); }
-}
-
-// STEP 3: Update parent flex container - add wrap + className for CSS
-const si2 = c.indexOf("setSchedTab(id)");
-if (si2 !== -1) {
-  const before = c.substring(si2 - 300, si2);
-  const g = before.lastIndexOf("gap:6");
-  if (g !== -1) {
-    const a = (si2 - 300) + g;
-    c = c.substring(0, a) + 'gap:8,flexWrap:"wrap",justifyContent:"flex-end"' + c.substring(a + 5);
-    console.log("[schedtab-buttons] Added flexWrap");
-  }
-}
-
-// STEP 4: Inject mobile-responsive CSS via runtime style element
-// Find the schedule module useEffect or add CSS injection
-const mobileCSS = [
-  "@media(max-width:768px){",
-  "  .schedtab-row{flex-wrap:wrap!important;gap:4px!important;justify-content:center!important}",
-  "  .schedtab-row button{padding:6px 10px!important;font-size:11px!important;border-radius:8px!important;white-space:nowrap}",
-  "  .sched-toolbar{flex-direction:column!important;gap:8px!important;align-items:stretch!important}",
-  "  .sched-toolbar>div{justify-content:center!important}",
-  "}",
-].join("\n");
-
-// Add className to the schedTab button container
+// STEP 3: Add id="schedtab-row" to the tab-button container
 const si3 = c.indexOf("setSchedTab(id)");
 if (si3 !== -1) {
-  const bk = c.substring(si3 - 350, si3);
-  const dv = bk.lastIndexOf('<div style={{display:"flex"');
-  if (dv !== -1) {
-    const a = (si3 - 350) + dv + 4; // after "<div"
-    c = c.substring(0, a) + ' className="schedtab-row"' + c.substring(a);
-    console.log("[schedtab-buttons] Added className to button row");
-  }
+    const bk = c.substring(si3 - 400, si3);
+    const dv = bk.lastIndexOf('<div style={{display:"flex"');
+    if (dv !== -1) {
+          const a = (si3 - 400) + dv + 4;
+          if (!c.substring(a, a + 30).includes('id=')) {
+                  c = c.substring(0, a) + ' id="schedtab-row"' + c.substring(a);
+                  console.log("[schedtab-buttons] STEP 3: Added id to button row");
+          }
+    }
 }
 
-// Add className to the toolbar row (parent that has both viewMode + schedTab)
-const si4 = c.indexOf("schedtab-row");
+// STEP 4: Add id="sched-toolbar" to the parent toolbar
+const si4 = c.indexOf('id="schedtab-row"');
 if (si4 !== -1) {
-  const bk2 = c.substring(si4 - 500, si4);
-  // Find the outer flex div that contains justifyContent:"space-between"
-  const od = bk2.lastIndexOf('<div style={{display:"flex"');
-  if (od !== -1) {
-    const a = (si4 - 500) + od + 4;
-    c = c.substring(0, a) + ' className="sched-toolbar"' + c.substring(a);
-    console.log("[schedtab-buttons] Added className to toolbar");
-  }
+    const bk2 = c.substring(si4 - 600, si4);
+    const od = bk2.lastIndexOf('<div style={{display:"flex"');
+    if (od !== -1) {
+          const a = (si4 - 600) + od + 4;
+          if (!c.substring(a, a + 30).includes('id=')) {
+                  c = c.substring(0, a) + ' id="sched-toolbar"' + c.substring(a);
+                  console.log("[schedtab-buttons] STEP 4: Added id to toolbar");
+          }
+    }
 }
 
-// Inject the CSS style block into the schedule section JSX
-// Find the Scheduling section and add a style element
-const cssEl = '<style>{`' + mobileCSS + '`}</style>';
+// STEP 5: Update flex container styles
+c = c.replace(/(<div[^>]*id="schedtab-row"[^>]*style=\{\{display:"flex"),gap:\d\b/, '$1,flexDirection:"row",flexWrap:"wrap",gap:8');
+console.log("[schedtab-buttons] STEP 5: Updated flex container");
+
+// STEP 6: Inject mobile CSS into index.html
+const HTML = "index.html";
+let html = readFileSync(HTML, "utf8");
+const CM = "/* SCHEDTAB_MOBILE_V2 */";
+if (!html.includes(CM)) {
+    const css = `<style>${CM}
+    @media(max-width:768px){
+      #sched-toolbar{flex-direction:column!important;gap:6px!important;align-items:stretch!important}
+        #sched-toolbar>div{justify-content:center!important;flex-wrap:wrap!important}
+          #schedtab-row{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:4px!important;justify-content:center!important;width:100%!important}
+            #schedtab-row button{padding:6px 10px!important;font-size:11px!important;border-radius:8px!important;white-space:nowrap!important;flex:0 0 auto!important}
+            }
+            @media(max-width:480px){
+              #schedtab-row button{padding:5px 8px!important;font-size:10px!important}
+              }
+              </style>`;
+    html = html.replace("</head>", css + "\n</head>");
+    writeFileSync(HTML, html);
+    console.log("[schedtab-buttons] STEP 6: Injected CSS into index.html");
+}
+
+// STEP 7: Also inject style tag in JSX as backup
 const heading = c.indexOf("Scheduling</");
 if (heading !== -1) {
-  // Find the parent div or section that wraps the schedule content
-  const parentDiv = c.lastIndexOf("<div", heading);
-  if (parentDiv !== -1 && heading - parentDiv < 100) {
-    c = c.substring(0, parentDiv) + cssEl + c.substring(parentDiv);
-    console.log("[schedtab-buttons] Injected mobile CSS");
-  }
+    const pd = c.lastIndexOf("<div", heading);
+    if (pd !== -1 && heading - pd < 100) {
+          const stag = '<style>{`' + MARKER + '\n@media(max-width:768px){#sched-toolbar{flex-direction:column!important;gap:6px!important;align-items:stretch!important}#sched-toolbar>div{justify-content:center!important;flex-wrap:wrap!important}#schedtab-row{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:4px!important;justify-content:center!important;width:100%!important}#schedtab-row button{padding:6px 10px!important;font-size:11px!important;border-radius:8px!important;white-space:nowrap!important;flex:0 0 auto!important}}@media(max-width:480px){#schedtab-row button{padding:5px 8px!important;font-size:10px!important}}`}</style>';
+          c = c.substring(0, pd) + stag + c.substring(pd);
+          console.log("[schedtab-buttons] STEP 7: Injected JSX style tag");
+    }
 }
 
-c = MARKER + "\n" + c;
-writeFileSync(FILE, c, "utf8");
-console.log("[schedtab-buttons] Done!");
+writeFileSync(FILE, c);
+console.log("[schedtab-buttons] All patches applied!");
