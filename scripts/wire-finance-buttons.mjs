@@ -62,7 +62,7 @@ async function sendInvoiceToAPI(estObj, clientEml) {
       status: "pending",
       jobId: estObj.jobId || ""
     };
-    var resp = await fetch("/api/send-invoice-v2", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+    var resp = await fetch("/api/send-invoice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
     var result = await resp.json();
     if (result.ok) {
       setSavedInvoices(function(prev) { return [].concat(prev, [{ number: invNum, date: today, total: total, items: jobItems, clientName: estObj.clientName, jobId: estObj.jobId, url: result.cloudinary ? result.cloudinary.url : null, sent: !!result.messageId, to: clientEml, fromEstimate: estObj.number || "" }]); });
