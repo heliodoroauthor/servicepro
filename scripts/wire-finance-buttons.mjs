@@ -62,7 +62,7 @@ async function sendInvoiceToAPI(estObj, clientEml) {
       status: "pending",
       jobId: estObj.jobId || ""
     };
-    var resp = await fetch("/api/send-invoice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+    var resp = await fetch("/api/send-invoice-v2", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
     var result = await resp.json();
     if (result.ok) {
       setSavedInvoices(function(prev) { return [].concat(prev, [{ number: invNum, date: today, total: total, items: jobItems, clientName: estObj.clientName, jobId: estObj.jobId, url: result.cloudinary ? result.cloudinary.url : null, sent: !!result.messageId, to: clientEml, fromEstimate: estObj.number || "" }]); });
@@ -323,6 +323,10 @@ const invContent = `s.key==="inv" ? (
 </div>
 </div>
 {inv.url && <a href={inv.url} target="_blank" rel="noopener" style={{display:"inline-block",marginTop:8,color:"#1565C0",fontSize:12,textDecoration:"underline"}}>View PDF</a>}
+<div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+{!inv.sent && <button onClick={function(ev){ev.stopPropagation();var job=appts.find(function(j){return j.id===inv.jobId})||{};var cl=job.clientId?clientById(job.clientId):null;var em=cl&&cl.email?cl.email:null;if(!em){alert("No email found for this client. Please add an email to the client record first.");return;}sendInvoiceToAPI(inv,em);}} disabled={financeLoading==="invoice"} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #2E7D32",background:"#2E7D32",color:"#fff",fontSize:12,cursor:"pointer"}}>{financeLoading==="invoice"?"Sending...":"\u{1F4E4} Send Invoice"}</button>}
+{inv.sent && <button onClick={function(ev){ev.stopPropagation();var job=appts.find(function(j){return j.id===inv.jobId})||{};var cl=job.clientId?clientById(job.clientId):null;var em=cl&&cl.email?cl.email:null;if(!em){alert("No email found for this client. Please add an email to the client record first.");return;}sendInvoiceToAPI(inv,em);}} disabled={financeLoading==="invoice"} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #666",background:"#666",color:"#fff",fontSize:12,cursor:"pointer"}}>{financeLoading==="invoice"?"Sending...":"\u{1F4E4} Resend Invoice"}</button>}
+</div>
 </div>
 ); })}
 </div>
