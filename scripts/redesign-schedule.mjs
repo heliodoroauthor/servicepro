@@ -18,13 +18,24 @@ if (wvStart === -1) {
   process.exit(1);
 }
 
-// Find the end of the WeekView function - track braces
+// Find the end of the WeekView function - skip past params, then track braces
+// First skip past the parameter destructuring to find the function body '{'
+let paramDepth = 0;
+let bodyStart = -1;
+for (let i = wvStart; i < c.length; i++) {
+  if (c[i] === '(') paramDepth++;
+  if (c[i] === ')') { paramDepth--; if (paramDepth === 0) {
+    // Found end of params, now find the opening '{' of the function body
+    bodyStart = c.indexOf('{', i + 1);
+    break;
+  }}
+}
+if (bodyStart === -1) { console.error('[redesign-schedule] Cannot find WeekView body'); process.exit(1); }
 let braceDepth = 0;
 let wvEnd = -1;
-let inFunc = false;
-for (let i = wvStart; i < c.length; i++) {
-  if (c[i] === '{') { braceDepth++; inFunc = true; }
-  if (c[i] === '}') { braceDepth--; if (inFunc && braceDepth === 0) { wvEnd = i + 1; break; } }
+for (let i = bodyStart; i < c.length; i++) {
+  if (c[i] === '{') braceDepth++;
+  if (c[i] === '}') { braceDepth--; if (braceDepth === 0) { wvEnd = i + 1; break; } }
 }
 
 if (wvEnd === -1) {
