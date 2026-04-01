@@ -198,7 +198,7 @@ for (let i = ciOcStart; i < createInvBtnIdx; i++) {
 }
 console.log('[wire-finance-buttons] STEP 4: Found Create Invoice onClick: ' + c.substring(ciOcStart, ciOcEnd).substring(0, 60));
 
-const newCiOnClick = `onClick={()=>{if(!estItems||estItems.length===0){alert("Add items to the estimate first, then create invoice.");return;}var jd=appts.find(function(jj){return jj.id===selJob;})||{};var em=prompt("Enter client eml to send invoice to:");if(em){var estObj={items:estItems,clientName:jd.client||jd.clientName||"Customer",jobId:jd.id||"",jobTitle:jd.title||jd.address||""};sendInvoiceToAPI(estObj,em);}}}`;
+const newCiOnClick = `onClick={()=>{if(!estItems||estItems.length===0){alert("Add items to the estimate first, then create invoice.");return;}var jd=appts.find(function(jj){return jj.id===selJob;})||{};var invNum="INV-"+Date.now().toString(36).toUpperCase();var today=new Date().toLocaleDateString("en-US");var items=estItems.map(function(it){return{name:it.name||it.description||"Service",qty:it.qty||1,price:it.price||it.unitPrice||0,description:it.name||it.description||"Service",unitPrice:it.price||it.unitPrice||0};});var subtotal=items.reduce(function(s,it){return s+(it.qty*it.price);},0);var tax=subtotal*0.0825;var total=subtotal+tax;setSavedInvoices(function(prev){return[].concat(prev,[{number:invNum,date:today,total:total,items:items,clientName:jd.client||jd.clientName||"Customer",jobId:jd.id||"",jobTitle:jd.title||jd.address||"",sent:false,to:null,url:null,fromEstimate:""}]);});setEstItems([]);close();alert("Invoice "+invNum+" created! Total: $"+total.toFixed(2));}}`;
 
 c = c.substring(0, ciOcStart) + newCiOnClick + c.substring(ciOcEnd);
 console.log('[wire-finance-buttons] STEP 4: Rewired Create Invoice button');
