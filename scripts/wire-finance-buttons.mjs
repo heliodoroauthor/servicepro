@@ -198,7 +198,7 @@ for (let i = ciOcStart; i < createInvBtnIdx; i++) {
 }
 console.log('[wire-finance-buttons] STEP 4: Found Create Invoice onClick: ' + c.substring(ciOcStart, ciOcEnd).substring(0, 60));
 
-const newCiOnClick = `onClick={()=>{if(!estItems||estItems.length===0){alert("Add items to the estimate first, then create invoice.");return;}var jd=jobs.find(function(jj){return jj.id===selectedJob;})||{};var em=prompt("Enter client eml to send invoice to:");if(em){var estObj={items:estItems,clientName:jd.client||jd.clientName||"Customer",jobId:jd.id||"",jobTitle:jd.title||jd.address||""};sendInvoiceToAPI(estObj,em);}}}`;
+const newCiOnClick = `onClick={()=>{if(!estItems||estItems.length===0){alert("Add items to the estimate first, then create invoice.");return;}var jd=appts.find(function(jj){return jj.id===selJob;})||{};var em=prompt("Enter client eml to send invoice to:");if(em){var estObj={items:estItems,clientName:jd.client||jd.clientName||"Customer",jobId:jd.id||"",jobTitle:jd.title||jd.address||""};sendInvoiceToAPI(estObj,em);}}}`;
 
 c = c.substring(0, ciOcStart) + newCiOnClick + c.substring(ciOcEnd);
 console.log('[wire-finance-buttons] STEP 4: Rewired Create Invoice button');
