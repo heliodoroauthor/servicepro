@@ -129,13 +129,13 @@ function generateEstimatePDF(data) {
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(200).end();
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
   try {
     const { to, clientName, estimateNumber, estimateDate, validUntil, items, subtotal, tax, total, notes, companyName, companyPhone, companyEmail, status, jobId, jobTitle } = req.body;
     if (!to || !estimateNumber) return res.status(400).json({ error: 'Missing required fields: to, estimateNumber' });

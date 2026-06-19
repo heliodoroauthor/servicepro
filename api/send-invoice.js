@@ -197,7 +197,7 @@ function generateInvoicePDF(data) {
 // ââ Main handler ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(200).end();
@@ -207,7 +207,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
 
   try {
     const {
