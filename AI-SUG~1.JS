@@ -1,15 +1,20 @@
 // Vercel Serverless Function — POST /api/ai-suggest
-// Secure transparent proxy to the Anthropic Messages API.
-// The ANTHROPIC_API_KEY stays server-side (never shipped to the browser).
-// Accepts either:
-//   { prompt, maxTokens }                     — simple shape
-//   { model, max_tokens, system, messages }   — Anthropic shape (passed through)
-// Returns the Anthropic response verbatim, so existing `data.content[0].text`
-// callers keep working, plus convenience { success, text }.
+// Secure AI proxy. Keeps the provider key server-side and returns an
+// Anthropic-shaped response ({ content:[{text}] }) so every existing caller
+// (which reads data.content[0].text) keeps working unchanged.
+//
+// Provider is chosen by which env var is set — no code change to switch:
+//   GROQ_API_KEY     -> Groq (free tier, OpenAI-compatible)  [default: llama-3.3-70b-versatile]
+//   ANTHROPIC_API_KEY-> Anthropic Claude (fallback / upgrade later)
+//   neither          -> friendly "not configured" message (UI degrades gracefully)
+//
+// Accepts { prompt, maxTokens } OR { model, max_tokens, system, messages }.
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-20241022";
 
-// Best-effort in-memory rate limit (resets per serverless instance).
 const _hits = new Map();
 function rateLimited(ip, max = 30, windowMs = 60000) {
   const now = Date.now();
@@ -32,6 +37,11 @@ function setCors(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+// Always Anthropic-shaped so the front-end degrades gracefully on any issue.
+function reply(res, text) {
+  return res.status(200).json({ content: [{ type: "text", text: text }], success: true, text: text });
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -40,35 +50,54 @@ export default async function handler(req, res) {
   const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
   if (rateLimited(ip)) return res.status(429).json({ error: "Too many requests, slow down." });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY is not configured on the server." });
-
   const body = req.body || {};
-  let { model, max_tokens, maxTokens, system, messages, prompt } = body;
-
+  let { max_tokens, maxTokens, system, messages, prompt } = body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     if (!prompt) return res.status(400).json({ error: "Provide 'messages' or 'prompt'." });
     messages = [{ role: "user", content: prompt }];
   }
+  const maxTok = max_tokens || maxTokens || 1024;
 
-  const payload = { model: model || DEFAULT_MODEL, max_tokens: max_tokens || maxTokens || 1024, messages };
-  if (system) payload.system = system;
+  const groqKey = process.env.GROQ_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      console.error("Claude API error:", r.status, data);
-      return res.status(r.status).json({ error: data?.error?.message || "Claude API error", detail: data });
+    // ---- Groq (free, OpenAI-compatible) ----
+    if (groqKey) {
+      const msgs = system ? [{ role: "system", content: system }, ...messages] : messages;
+      const r = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + groqKey },
+        body: JSON.stringify({
+          model: process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL,
+          messages: msgs,
+          max_tokens: maxTok,
+          temperature: 0.7,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) { console.error("Groq error:", r.status, data); return reply(res, "The AI service had an issue. Please try again in a moment."); }
+      return reply(res, (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "");
     }
-    const text = data?.content?.[0]?.text || "";
-    return res.status(200).json({ ...data, success: true, text });
+
+    // ---- Anthropic Claude (fallback / future upgrade) ----
+    if (anthropicKey) {
+      const payload = { model: process.env.ANTHROPIC_MODEL || DEFAULT_ANTHROPIC_MODEL, max_tokens: maxTok, messages };
+      if (system) payload.system = system;
+      const r = await fetch(ANTHROPIC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json();
+      if (!r.ok) { console.error("Anthropic error:", r.status, data); return reply(res, "The AI service had an issue. Please try again in a moment."); }
+      return reply(res, (data && data.content && data.content[0] && data.content[0].text) || "");
+    }
+
+    // ---- Nothing configured ----
+    return reply(res, "AI is not configured yet. Add a free GROQ_API_KEY in the server settings to turn on AI features.");
   } catch (err) {
     console.error("ai-suggest error:", err.message);
-    return res.status(500).json({ error: "Server error", detail: err.message });
+    return reply(res, "AI is temporarily unavailable. Please try again.");
   }
 }
