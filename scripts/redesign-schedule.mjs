@@ -92,10 +92,10 @@ function WeekView({ appts, clients, staff, year, month, selDay, onDayClick, onAp
   }
 
   return (
-    <div style={{background:"#fff",borderRadius:12,overflow:"hidden",border:"1px solid #e2e8f0"}}>
+    <div style={{background:"var(--surface)",borderRadius:12,overflow:"hidden",border:"1px solid var(--border)"}}>
       {/* Week header */}
-      <div style={{display:"grid",gridTemplateColumns:"56px repeat(7,1fr)",borderBottom:"2px solid #e2e8f0"}}>
-        <div style={{padding:"12px 4px",background:"#f8fafc",borderRight:"1px solid #e2e8f0"}}/>
+      <div style={{display:"grid",gridTemplateColumns:"56px repeat(7,1fr)",borderBottom:"2px solid var(--border)"}}>
+        <div style={{padding:"12px 4px",background:"var(--s2)",borderRight:"1px solid var(--border)"}}/>
         {weekDays.map(function(day, di) {
           var ds = day.toISOString().slice(0, 10);
           var isToday = ds === todayStr;
@@ -103,11 +103,11 @@ function WeekView({ appts, clients, staff, year, month, selDay, onDayClick, onAp
           var dayNames = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
           return (
             <div key={di} onClick={function() { onDayClick && onDayClick(day.getDate(), day.getMonth(), day.getFullYear()); }}
-              style={{padding:"8px 4px",textAlign:"center",cursor:"pointer",background:isToday?"#fff7ed":isSel?"#f0f9ff":"#f8fafc",borderRight:di<6?"1px solid #e2e8f0":"none",borderBottom:isToday?"3px solid #f97316":isSel?"3px solid #3b82f6":"3px solid transparent",transition:"all .15s"}}>
-              <div style={{fontSize:11,fontWeight:700,color:isToday?"#ea580c":"#94a3b8",textTransform:"uppercase",letterSpacing:1}}>
+              style={{padding:"8px 4px",textAlign:"center",cursor:"pointer",background:isToday?"rgba(249,115,22,0.14)":isSel?"rgba(59,130,246,0.16)":"var(--s2)",borderRight:di<6?"1px solid var(--border)":"none",borderBottom:isToday?"3px solid #f97316":isSel?"3px solid #3b82f6":"3px solid transparent",transition:"all .15s"}}>
+              <div style={{fontSize:11,fontWeight:700,color:isToday?"#ea580c":"var(--muted)",textTransform:"uppercase",letterSpacing:1}}>
                 {dayNames[di]}
               </div>
-              <div style={{fontSize:22,fontWeight:800,color:isToday?"#ea580c":isSel?"#2563eb":"#1e293b",marginTop:2}}>
+              <div style={{fontSize:22,fontWeight:800,color:isToday?"#ea580c":isSel?"#2563eb":"var(--text)",marginTop:2}}>
                 {day.getDate()}
               </div>
             </div>
@@ -117,12 +117,12 @@ function WeekView({ appts, clients, staff, year, month, selDay, onDayClick, onAp
       {/* Time grid */}
       <div style={{display:"grid",gridTemplateColumns:"56px repeat(7,1fr)",position:"relative",maxHeight:HOUR_HEIGHT*HOURS.length,overflowY:"auto"}}>
         {/* Hour labels */}
-        <div style={{background:"#f8fafc",borderRight:"1px solid #e2e8f0"}}>
+        <div style={{background:"var(--s2)",borderRight:"1px solid var(--border)"}}>
           {HOURS.map(function(h) {
             var label = h === 0 ? "12 AM" : h < 12 ? h + " AM" : h === 12 ? "12 PM" : (h-12) + " PM";
             return (
-              <div key={h} style={{height:HOUR_HEIGHT,borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"flex-start",justifyContent:"flex-end",paddingRight:8,paddingTop:0}}>
-                <span style={{fontSize:10,fontWeight:600,color:"#94a3b8",marginTop:-6}}>{label}</span>
+              <div key={h} style={{height:HOUR_HEIGHT,borderBottom:"1px solid var(--border)",display:"flex",alignItems:"flex-start",justifyContent:"flex-end",paddingRight:8,paddingTop:0}}>
+                <span style={{fontSize:10,fontWeight:600,color:"var(--muted)",marginTop:-6}}>{label}</span>
               </div>
             );
           })}
@@ -133,10 +133,10 @@ function WeekView({ appts, clients, staff, year, month, selDay, onDayClick, onAp
           var dayAppts = appts.filter(function(a) { return a.date === ds; });
           var isToday = ds === todayStr;
           return (
-            <div key={di} style={{position:"relative",borderRight:di<6?"1px solid #e2e8f0":"none",background:isToday?"rgba(249,115,22,0.02)":"transparent"}}>
+            <div key={di} style={{position:"relative",borderRight:di<6?"1px solid var(--border)":"none",background:isToday?"rgba(249,115,22,0.02)":"transparent"}}>
               {/* Hour grid lines */}
               {HOURS.map(function(h) {
-                return <div key={h} style={{height:HOUR_HEIGHT,borderBottom:"1px solid #f1f5f9"}}/>;
+                return <div key={h} style={{height:HOUR_HEIGHT,borderBottom:"1px solid var(--border)"}}/>;
               })}
               {/* Now indicator */}
               {isToday && (function() {
@@ -159,8 +159,8 @@ function WeekView({ appts, clients, staff, year, month, selDay, onDayClick, onAp
                 return (
                   <div key={a.id || ai} onClick={function(ev) { ev.stopPropagation(); onApptClick && onApptClick(a); }}
                     style={{position:"absolute",top:top,left:2,right:2,height:height,background:bgColor+"18",border:"2px solid "+bgColor,borderRadius:6,padding:"3px 6px",cursor:"pointer",overflow:"hidden",zIndex:2,borderLeft:"4px solid "+bgColor,transition:"box-shadow .15s"}}>
-                    <div style={{fontSize:11,fontWeight:800,color:"#1e293b",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.service || cl || "Appointment"}</div>
-                    {height > 30 && <div style={{fontSize:10,color:"#64748b",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.time}{cl ? " - "+cl : ""}</div>}
+                    <div style={{fontSize:11,fontWeight:800,color:"var(--text)",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.service || cl || "Appointment"}</div>
+                    {height > 30 && <div style={{fontSize:10,color:"var(--muted)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.time}{cl ? " - "+cl : ""}</div>}
                     {height > 48 && tech && <div style={{fontSize:9,color:bgColor,fontWeight:700,marginTop:1}}>{tech}</div>}
                   </div>
                 );
@@ -214,20 +214,20 @@ console.log('[redesign-schedule] Found timeline block from ' + timelineBlockStar
 
 const newTimelineView = `{/* REDESIGNED TIMELINE - Day view with time slots */}
 {schedTab==="calendar" && viewMode==="timeline" && (
-<div style={{background:"#fff",borderRadius:12,overflow:"hidden",border:"1px solid #e2e8f0",marginBottom:12}}>
+<div style={{background:"var(--surface)",borderRadius:12,overflow:"hidden",border:"1px solid var(--border)",marginBottom:12}}>
 {/* Day selector strip */}
-<div style={{display:"flex",overflowX:"auto",background:"#f8fafc",borderBottom:"2px solid #e2e8f0",padding:"4px 8px",gap:4}}>
+<div style={{display:"flex",overflowX:"auto",background:"var(--s2)",borderBottom:"2px solid var(--border)",padding:"4px 8px",gap:4}}>
 {Array.from({length:7},(_,i)=>{
 const d=new Date(year,month,1+i+(selDay?selDay-1:0));
 const dayNum=d.getDate();
 const isToday=d.toISOString().slice(0,10)===new Date().toISOString().slice(0,10);
 const isSel=selDay===dayNum;
 return (
-<div key={i} onClick={()=>setSelDay(dayNum)} style={{flex:"0 0 auto",minWidth:56,padding:"8px 10px",textAlign:"center",cursor:"pointer",background:isSel?"#1e293b":isToday?"#fff7ed":"transparent",borderRadius:10,transition:"all .15s"}}>
-<div style={{fontSize:10,fontWeight:700,color:isSel?"#94a3b8":isToday?"#ea580c":"#94a3b8",textTransform:"uppercase",letterSpacing:1}}>
+<div key={i} onClick={()=>setSelDay(dayNum)} style={{flex:"0 0 auto",minWidth:56,padding:"8px 10px",textAlign:"center",cursor:"pointer",background:isSel?"#f97316":isToday?"rgba(249,115,22,0.14)":"transparent",borderRadius:10,transition:"all .15s"}}>
+<div style={{fontSize:10,fontWeight:700,color:isSel?"var(--muted)":isToday?"#ea580c":"var(--muted)",textTransform:"uppercase",letterSpacing:1}}>
 {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}
 </div>
-<div style={{fontSize:18,fontWeight:800,color:isSel?"#fff":isToday?"#ea580c":"#1e293b",marginTop:2}}>
+<div style={{fontSize:18,fontWeight:800,color:isSel?"#fff":isToday?"#ea580c":"var(--text)",marginTop:2}}>
 {dayNum}
 </div>
 </div>
@@ -240,8 +240,8 @@ return (
 const dayAppts = selDay ? appts.filter(a=>a.date===ds(selDay)) : appts.filter(a=>a.date===_schedTodayStr);
 if(dayAppts.length===0) return <div style={{padding:"50px 0",textAlign:"center"}}>
 <div style={{fontSize:40,marginBottom:8,opacity:0.3}}>ð</div>
-<div style={{color:"#94a3b8",fontSize:14,fontWeight:600}}>No appointments this day</div>
-<div style={{color:"#cbd5e1",fontSize:12,marginTop:4}}>Click + New to schedule one</div>
+<div style={{color:"var(--muted)",fontSize:14,fontWeight:600}}>No appointments this day</div>
+<div style={{color:"var(--muted)",fontSize:12,marginTop:4}}>Click + New to schedule one</div>
 </div>;
 var ECOLORS=["#7c5cfc","#f97316","#3b82f6","#22c55e","#ef4444","#06b6d4","#ec4899"];
 return <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -249,22 +249,22 @@ return <div style={{display:"flex",flexDirection:"column",gap:8}}>
 var cl=clientById(a.clientId);
 var tech=staffById(a.techId);
 var bgColor=tech?.color||ECOLORS[ai%ECOLORS.length];
-return <div key={a.id||ai} onClick={function(){onApptClick?onApptClick(a):setSelAppt?.(a);setSelDay(parseInt(a.date.slice(8,10)));}} style={{display:"flex",gap:0,cursor:"pointer",borderRadius:10,overflow:"hidden",border:"1px solid #e2e8f0",background:"#fff",transition:"box-shadow .15s"}}>
+return <div key={a.id||ai} onClick={function(){onApptClick?onApptClick(a):setSelAppt?.(a);setSelDay(parseInt(a.date.slice(8,10)));}} style={{display:"flex",gap:0,cursor:"pointer",borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)",transition:"box-shadow .15s"}}>
 <div style={{width:5,background:bgColor,flexShrink:0}}/>
 <div style={{padding:"12px 16px",flex:1,minWidth:0}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
 <div style={{flex:1,minWidth:0}}>
-<div style={{fontSize:14,fontWeight:700,color:"#1e293b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.service||"Appointment"}</div>
-<div style={{fontSize:12,color:"#64748b",marginTop:2}}>{cl?.name||""}{cl?.address?" Â· "+cl.address:""}</div>
+<div style={{fontSize:14,fontWeight:700,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.service||"Appointment"}</div>
+<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>{cl?.name||""}{cl?.address?" Â· "+cl.address:""}</div>
 </div>
 <div style={{textAlign:"right",flexShrink:0}}>
 <div style={{fontSize:13,fontWeight:700,color:bgColor}}>{a.time||"TBD"}</div>
-<div style={{fontSize:11,color:"#94a3b8"}}>{a.duration?a.duration+"min":"â"}</div>
+<div style={{fontSize:11,color:"var(--muted)"}}>{a.duration?a.duration+"min":"â"}</div>
 </div>
 </div>
 {tech && <div style={{display:"flex",alignItems:"center",gap:6,marginTop:8}}>
 <div style={{width:20,height:20,borderRadius:"50%",background:bgColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff"}}>{tech.name?.charAt(0)}</div>
-<span style={{fontSize:11,fontWeight:600,color:"#64748b"}}>{tech.name?.split(" ")[0]}</span>
+<span style={{fontSize:11,fontWeight:600,color:"var(--muted)"}}>{tech.name?.split(" ")[0]}</span>
 <span style={{marginLeft:"auto",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:a.status==="completed"?"#dcfce7":a.status==="cancelled"?"#fee2e2":"#fef3c7",color:a.status==="completed"?"#16a34a":a.status==="cancelled"?"#dc2626":"#d97706",textTransform:"uppercase",letterSpacing:0.5}}>{a.status||"scheduled"}</span>
 </div>}
 </div>
@@ -295,20 +295,20 @@ if (typeof document !== "undefined" && !document.getElementById("sched-redesign-
   styleEl.id = "sched-redesign-css";
   styleEl.textContent = \`
     /* Light content area for schedule */
-    .page .fade .card { background: #fff !important; color: #1e293b !important; border: 1px solid #e2e8f0 !important; }
-    .page .fade .card .ch { background: #f8fafc !important; border-bottom: 1px solid #e2e8f0 !important; }
-    .page .fade .card .ch .ct { color: #1e293b !important; }
-    .page .fade .card .ch button { color: #475569 !important; border-color: #e2e8f0 !important; background: #fff !important; }
-    .page .fade .card .ch button:hover { background: #f1f5f9 !important; }
+    .page .fade .card { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+    .page .fade .card .ch { background: var(--s2) !important; border-bottom: 1px solid var(--border) !important; }
+    .page .fade .card .ch .ct { color: var(--text) !important; }
+    .page .fade .card .ch button { color: var(--muted) !important; border-color: var(--border) !important; background: var(--surface) !important; }
+    .page .fade .card .ch button:hover { background: var(--s2) !important; }
 
     /* Calendar grid light theme */
-    .page .fade .card div[style*="grid-template-columns: repeat(7"] > div { color: #64748b !important; }
+    .page .fade .card div[style*="grid-template-columns: repeat(7"] > div { color: var(--muted) !important; }
 
     /* Schedule toggle pills */
-    .sched-toggle { background: #f1f5f9 !important; border-radius: 10px !important; padding: 3px !important; }
-    .sched-toggle-btn { color: #64748b !important; border-radius: 8px !important; padding: 7px 16px !important; font-weight: 700 !important; font-size: 13px !important; transition: all .15s !important; background: transparent !important; border: none !important; }
-    .sched-toggle-btn.active { background: #1e293b !important; color: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,.15) !important; }
-    .sched-toggle-btn:hover:not(.active) { background: #e2e8f0 !important; color: #1e293b !important; }
+    .sched-toggle { background: var(--s2) !important; border-radius: 10px !important; padding: 3px !important; }
+    .sched-toggle-btn { color: var(--muted) !important; border-radius: 8px !important; padding: 7px 16px !important; font-weight: 700 !important; font-size: 13px !important; transition: all .15s !important; background: transparent !important; border: none !important; }
+    .sched-toggle-btn.active { background: #f97316 !important; color: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,.15) !important; }
+    .sched-toggle-btn:hover:not(.active) { background: var(--border) !important; color: var(--text) !important; }
 
     /* Header area */
     .sched-header { background: transparent !important; }
